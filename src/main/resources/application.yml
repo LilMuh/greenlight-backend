@@ -1,0 +1,5 @@
+server:
+  port: 8080
+
+# DB / JPA / mail wiring is added once the schema columns are finalized.
+# For now the app boots standalone and serves /api/health + a stub /api/tee-times.
