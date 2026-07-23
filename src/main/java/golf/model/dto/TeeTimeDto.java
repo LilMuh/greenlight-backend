@@ -1,16 +1,15 @@
 package golf.model.dto;
 
-/**
- * Wire shape for a tee time returned to the frontend.
- * Fields are not finalized yet — mirrors the scraper's TeeTime contract and
- * fills out once the DB schema columns are locked down.
- */
+import java.math.BigDecimal;
+
+/** 返回给前端展示的一条时段。 */
 public record TeeTimeDto(
-        String time,
+        String courseId,
+        String course, // 球场展示名（slug 经 CourseCatalog 映射）
         String date,
-        String course,
-        Integer holes,
-        Double price,
-        Boolean available
-) {
+        String time,
+        int holes,
+        int players,
+        BigDecimal price,
+        boolean available) {
 }

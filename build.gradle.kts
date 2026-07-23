@@ -20,8 +20,11 @@ repositories {
 dependencies {
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-validation")
-    // Added once the schema columns are finalized and we wire the DB:
-    //   spring-boot-starter-data-jpa, spring-boot-starter-mail, org.postgresql:postgresql
+    implementation("org.springframework.boot:spring-boot-starter-data-jpa")
+    runtimeOnly("org.postgresql:postgresql")
+    compileOnly("org.projectlombok:lombok")
+    annotationProcessor("org.projectlombok:lombok")
+    // 邮件提醒（step 1 再启用）：spring-boot-starter-mail
     testImplementation("org.springframework.boot:spring-boot-starter-test")
 }
 

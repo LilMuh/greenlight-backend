@@ -1,5 +1,17 @@
 server:
   port: 8080
 
-# DB / JPA / mail wiring is added once the schema columns are finalized.
-# For now the app boots standalone and serves /api/health + a stub /api/tee-times.
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/greenlight
+    username: greenlight
+    password: change-me
+  jpa:
+    hibernate:
+      # schema 由 greenlight-database 的 Liquibase 拥有，这里只校验实体和表是否对得上
+      ddl-auto: validate
+    properties:
+      hibernate.jdbc.time_zone: UTC
+  # 迁移不归后端管
+  liquibase:
+    enabled: false
