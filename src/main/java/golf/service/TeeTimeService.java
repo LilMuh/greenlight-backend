@@ -3,8 +3,8 @@ package golf.service;
 import java.time.LocalDate;
 import java.util.List;
 
-import golf.client.CourseCatalog;
 import golf.model.dto.TeeTimeDto;
+import golf.model.entity.Course;
 import golf.model.entity.TeeTime;
 import golf.repository.TeeTimeRepository;
 import org.springframework.stereotype.Service;
@@ -14,29 +14,28 @@ import org.springframework.stereotype.Service;
 public class TeeTimeService {
 
     private final TeeTimeRepository repository;
-    private final CourseCatalog courseCatalog;
 
-    public TeeTimeService(TeeTimeRepository repository, CourseCatalog courseCatalog) {
+    public TeeTimeService(TeeTimeRepository repository) {
         this.repository = repository;
-        this.courseCatalog = courseCatalog;
     }
 
-    public List<TeeTimeDto> findAvailable(LocalDate date, String courseId) {
-        List<TeeTime> rows = (courseId == null || courseId.isBlank())
+    public List<TeeTimeDto> findAvailable(LocalDate date, String courseSlug) {
+        List<TeeTime> rows = (courseSlug == null || courseSlug.isBlank())
                 ? repository.findByPlayDateAndAvailableTrueOrderByTimeLocalAsc(date)
-                : repository.findByPlayDateAndCourseIdAndAvailableTrueOrderByTimeLocalAsc(date, courseId);
+                : repository.findByPlayDateAndCourse_SlugAndAvailableTrueOrderByTimeLocalAsc(date, courseSlug);
         return rows.stream().map(this::toDto).toList();
     }
 
-    private TeeTimeDto toDto(TeeTime t) {
+    private TeeTimeDto toDto(TeeTime teeTime) {
+        Course course = teeTime.getCourse();
         return new TeeTimeDto(
-                t.getCourseId(),
-                courseCatalog.nameOf(t.getCourseId()),
-                t.getPlayDate().toString(),
-                t.getTimeLocal(),
-                t.getHoles(),
-                t.getPlayers(),
-                t.getPrice(),
-                t.isAvailable());
+                course.getSlug(),
+                course.getName(),
+                teeTime.getPlayDate().toString(),
+                teeTime.getTimeLocal(),
+                teeTime.getHoles(),
+                teeTime.getPlayers(),
+                teeTime.getPrice(),
+                teeTime.isAvailable());
     }
 }

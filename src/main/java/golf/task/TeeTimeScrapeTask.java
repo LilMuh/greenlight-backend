@@ -10,6 +10,7 @@ import golf.model.dto.ScrapeResultDto;
 import golf.model.dto.ScrapeSummary;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
@@ -23,7 +24,7 @@ public class TeeTimeScrapeTask {
 
     private static final int PLAYERS = 4;
     private static final int HOLES = 18;
-    private static final int DAYS_AHEAD = 14;
+    private static final int DAYS_AHEAD = 6; // 今天起 7 天（含今天，offset 0..6）
 
     /** 要抓的球场组：一个 site 下的一批 course slug。 */
     enum Target {
@@ -44,6 +45,18 @@ public class TeeTimeScrapeTask {
 
     public TeeTimeScrapeTask(ScraperClient scraperClient) {
         this.scraperClient = scraperClient;
+    }
+
+    /**
+     * 定时入口：默认启动即先抓一轮，之后每隔一段（上一轮结束算起）再抓。
+     * 用 fixedDelay 而非 fixedRate/cron —— 一轮是多次串行抓取，耗时不定，
+     * 隔到上轮结束再开下轮可避免两轮重叠、把 OAB 挤爆。间隔写成配置项，改动不必重编译。
+     */
+    @Scheduled(
+            initialDelayString = "${greenlight.scrape.initial-delay-ms:0}",
+            fixedDelayString = "${greenlight.scrape.interval-ms:3600000}")
+    public void scheduledRun() {
+        run();
     }
 
     /** 跑一轮：目标 × 日期，逐个触发抓取，单个失败不影响其余。 */

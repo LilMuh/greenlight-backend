@@ -11,6 +11,6 @@ public interface TeeTimeRepository extends JpaRepository<TeeTime, Long> {
     /** 某天所有仍可订的时段，按时间排序。 */
     List<TeeTime> findByPlayDateAndAvailableTrueOrderByTimeLocalAsc(LocalDate playDate);
 
-    /** 某天某球场仍可订的时段。 */
-    List<TeeTime> findByPlayDateAndCourseIdAndAvailableTrueOrderByTimeLocalAsc(LocalDate playDate, String courseId);
+    /** 某天某球场（按 slug）仍可订的时段。 */
+    List<TeeTime> findByPlayDateAndCourse_SlugAndAvailableTrueOrderByTimeLocalAsc(LocalDate playDate, String slug);
 }

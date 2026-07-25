@@ -15,3 +15,9 @@ spring:
   # 迁移不归后端管
   liquibase:
     enabled: false
+
+# 定时抓取节奏（TeeTimeScrapeTask）
+greenlight:
+  scrape:
+    initial-delay-ms: 0        # 启动即先抓一轮
+    interval-ms: 3600000       # 之后每隔 1 小时（上一轮结束算起）

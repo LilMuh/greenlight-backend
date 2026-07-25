@@ -2,25 +2,25 @@ package golf.controller;
 
 import java.util.List;
 
-import golf.client.ScraperClient;
 import golf.model.dto.CourseDto;
+import golf.service.CourseService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/** 球场清单：透传 scraper 的 /courses，给前端下拉框用。 */
+/** 球场清单：从数据库读（course 表由 Liquibase 维护），给前端下拉框用。 */
 @RestController
 @RequestMapping("/api")
 public class CourseController {
 
-    private final ScraperClient scraperClient;
+    private final CourseService courseService;
 
-    public CourseController(ScraperClient scraperClient) {
-        this.scraperClient = scraperClient;
+    public CourseController(CourseService courseService) {
+        this.courseService = courseService;
     }
 
     @GetMapping("/courses")
     public List<CourseDto> courses() {
-        return scraperClient.getCourses();
+        return courseService.findAll();
     }
 }

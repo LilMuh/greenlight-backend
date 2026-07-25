@@ -1,15 +1,16 @@
 package golf.model.dto;
 
 import java.time.LocalDate;
-import java.util.List;
 
 /**
- * 关注订阅的读写载体，字段与前端 Watch Alerts 表单一一对应。
- * 创建时 id 为 null，更新时带上已有 id。
+ * 一条关注订阅（读取 / 更新用）。一条 watch 只关注一个球场。
+ * courseSlug / courseName 由后端从 course 关系带出，方便前端直接展示。
  */
 public record WatchConfigDto(
         Long id,
-        List<String> courseIds,
+        Long courseId,
+        String courseSlug,
+        String courseName,
         LocalDate dateStart,
         LocalDate dateEnd,
         String timeStart,
