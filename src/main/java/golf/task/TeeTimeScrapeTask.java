@@ -24,7 +24,7 @@ public class TeeTimeScrapeTask {
 
     private static final int PLAYERS = 4;
     private static final int HOLES = 18;
-    private static final int DAYS_AHEAD = 6; // 今天起 7 天（含今天，offset 0..6）
+    private static final int DAYS_AHEAD = 7; // 今天 + 后 7 天（含今天共 8 天，offset 0..7）
 
     /** 要抓的球场组：一个 site 下的一批 course slug。 */
     enum Target {
