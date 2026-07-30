@@ -26,7 +26,8 @@ public class TeeTimeService {
         return rows.stream().map(this::toDto).toList();
     }
 
-    private TeeTimeDto toDto(TeeTime teeTime) {
+    /** 供匹配引擎等只读路径复用，把一行 tee_time 转成前端 DTO。 */
+    public TeeTimeDto toDto(TeeTime teeTime) {
         Course course = teeTime.getCourse();
         return new TeeTimeDto(
                 course.getSlug(),

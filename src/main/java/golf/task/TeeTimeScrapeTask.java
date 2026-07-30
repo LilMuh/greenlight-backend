@@ -5,9 +5,11 @@ import java.util.ArrayList;
 import java.util.List;
 
 import golf.client.ScraperClient;
+import golf.model.dto.MatchResultDto;
 import golf.model.dto.ScrapeRequestDto;
 import golf.model.dto.ScrapeResultDto;
 import golf.model.dto.ScrapeSummary;
+import golf.service.WatchMatchService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -42,9 +44,11 @@ public class TeeTimeScrapeTask {
     }
 
     private final ScraperClient scraperClient;
+    private final WatchMatchService watchMatchService;
 
-    public TeeTimeScrapeTask(ScraperClient scraperClient) {
+    public TeeTimeScrapeTask(ScraperClient scraperClient, WatchMatchService watchMatchService) {
         this.scraperClient = scraperClient;
+        this.watchMatchService = watchMatchService;
     }
 
     /**
@@ -84,6 +88,20 @@ public class TeeTimeScrapeTask {
         }
 
         log.info("抓取触发完成：partition={} saved={} error={}", partitions, saved, errors.size());
+
+        // 每轮抓完顺带算一遍匹配，日志汇报命中情况；发通知留给后续 M3。
+        logMatches();
+
         return new ScrapeSummary(partitions, saved, errors);
+    }
+
+    /** 算一遍所有启用中 watch 的命中，把结果打进日志（当前只观察，不发邮件）。 */
+    private void logMatches() {
+        List<MatchResultDto> matches = watchMatchService.findAllMatches();
+        int totalHits = matches.stream().mapToInt(MatchResultDto::hitCount).sum();
+        log.info("匹配算完：watch={} 命中总数={}", matches.size(), totalHits);
+        for (MatchResultDto match : matches) {
+            log.info("  watch#{} {} 命中 {} 个空位", match.watchId(), match.courseName(), match.hitCount());
+        }
     }
 }
