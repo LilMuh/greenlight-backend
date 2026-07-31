@@ -21,8 +21,8 @@ public class TeeTimeService {
 
     public List<TeeTimeDto> findAvailable(LocalDate date, String courseSlug) {
         List<TeeTime> rows = (courseSlug == null || courseSlug.isBlank())
-                ? repository.findByPlayDateAndAvailableTrueOrderByTimeLocalAsc(date)
-                : repository.findByPlayDateAndCourse_SlugAndAvailableTrueOrderByTimeLocalAsc(date, courseSlug);
+                ? repository.findByPlayDateAndAvailableSeatsGreaterThanOrderByTimeLocalAsc(date, 0)
+                : repository.findByPlayDateAndCourse_SlugAndAvailableSeatsGreaterThanOrderByTimeLocalAsc(date, courseSlug, 0);
         return rows.stream().map(this::toDto).toList();
     }
 
@@ -35,7 +35,7 @@ public class TeeTimeService {
                 teeTime.getPlayDate().toString(),
                 teeTime.getTimeLocal(),
                 teeTime.getHoles(),
-                teeTime.getPlayers(),
+                teeTime.getAvailableSeats(),
                 teeTime.getPrice(),
                 teeTime.isAvailable());
     }

@@ -3,13 +3,14 @@ package golf.task;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import golf.client.ScraperClient;
-import golf.model.dto.MatchResultDto;
 import golf.model.dto.ScrapeRequestDto;
 import golf.model.dto.ScrapeResultDto;
 import golf.model.dto.ScrapeSummary;
-import golf.service.WatchMatchService;
+import golf.service.NotificationService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -24,7 +25,6 @@ public class TeeTimeScrapeTask {
 
     private static final Logger log = LoggerFactory.getLogger(TeeTimeScrapeTask.class);
 
-    private static final int PLAYERS = 4;
     private static final int HOLES = 18;
     private static final int DAYS_AHEAD = 7; // 今天 + 后 7 天（含今天共 8 天，offset 0..7）
 
@@ -44,11 +44,11 @@ public class TeeTimeScrapeTask {
     }
 
     private final ScraperClient scraperClient;
-    private final WatchMatchService watchMatchService;
+    private final NotificationService notificationService;
 
-    public TeeTimeScrapeTask(ScraperClient scraperClient, WatchMatchService watchMatchService) {
+    public TeeTimeScrapeTask(ScraperClient scraperClient, NotificationService notificationService) {
         this.scraperClient = scraperClient;
-        this.watchMatchService = watchMatchService;
+        this.notificationService = notificationService;
     }
 
     /**
@@ -70,12 +70,15 @@ public class TeeTimeScrapeTask {
         List<String> errors = new ArrayList<>();
         LocalDate today = LocalDate.now();
 
+        // 抓之前先给每条 watch 拍一张「当前满足的时段」快照，作为本轮上升沿判断的基线。
+        Map<Long, Set<Long>> satisfiedBeforeScrape = notificationService.snapshotSatisfying();
+
         for (Target target : Target.values()) {
             for (int dayOffset = 0; dayOffset <= DAYS_AHEAD; dayOffset++) {
                 LocalDate date = today.plusDays(dayOffset);
                 try {
                     ScrapeRequestDto request = new ScrapeRequestDto(
-                            target.source, target.site, target.courses, date.toString(), HOLES, PLAYERS);
+                            target.source, target.site, target.courses, date.toString(), HOLES);
                     ScrapeResultDto result = scraperClient.scrape(request);
                     saved += result.count();
                     partitions++;
@@ -89,19 +92,9 @@ public class TeeTimeScrapeTask {
 
         log.info("抓取触发完成：partition={} saved={} error={}", partitions, saved, errors.size());
 
-        // 每轮抓完顺带算一遍匹配，日志汇报命中情况；发通知留给后续 M3。
-        logMatches();
+        // 抓完对比快照，只对「本轮新变得满足」的时段发通知邮件。
+        notificationService.notifyRisingEdges(satisfiedBeforeScrape);
 
         return new ScrapeSummary(partitions, saved, errors);
-    }
-
-    /** 算一遍所有启用中 watch 的命中，把结果打进日志（当前只观察，不发邮件）。 */
-    private void logMatches() {
-        List<MatchResultDto> matches = watchMatchService.findAllMatches();
-        int totalHits = matches.stream().mapToInt(MatchResultDto::hitCount).sum();
-        log.info("匹配算完：watch={} 命中总数={}", matches.size(), totalHits);
-        for (MatchResultDto match : matches) {
-            log.info("  watch#{} {} 命中 {} 个空位", match.watchId(), match.courseName(), match.hitCount());
-        }
     }
 }

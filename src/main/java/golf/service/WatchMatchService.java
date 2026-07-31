@@ -39,14 +39,17 @@ public class WatchMatchService {
                 .toList();
     }
 
-    /** 算一条 watch 的命中：按其条件查 tee_time，转成 DTO 打包。 */
-    private MatchResultDto matchOne(WatchConfig watch) {
+    /**
+     * 一条 watch 当前命中的原始行（含 id / 空位数），供匹配展示和通知去重共用。
+     * 条件：球场、日期区间、时间区间、空位数 ≥ 需求人数、价格 ≤ 上限、仍可订。
+     */
+    public List<TeeTime> findMatchingRows(WatchConfig watch) {
         Course course = watch.getCourse();
         // maxPrice 存的是加元整数，tee_time.price 是 BigDecimal，比较前统一成 BigDecimal。
         BigDecimal maxPrice = BigDecimal.valueOf(watch.getMaxPrice());
 
-        List<TeeTime> matchedRows = teeTimeRepository
-                .findByCourse_IdAndPlayDateBetweenAndTimeLocalBetweenAndPlayersGreaterThanEqualAndPriceLessThanEqualAndAvailableTrueOrderByPlayDateAscTimeLocalAsc(
+        return teeTimeRepository
+                .findByCourse_IdAndPlayDateBetweenAndTimeLocalBetweenAndAvailableSeatsGreaterThanEqualAndPriceLessThanEqualAndAvailableTrueOrderByPlayDateAscTimeLocalAsc(
                         course.getId(),
                         watch.getDateStart(),
                         watch.getDateEnd(),
@@ -54,8 +57,12 @@ public class WatchMatchService {
                         watch.getTimeEnd(),
                         watch.getPlayers(),
                         maxPrice);
+    }
 
-        List<TeeTimeDto> hits = matchedRows.stream().map(teeTimeService::toDto).toList();
+    /** 算一条 watch 的命中并打包成前端 DTO。 */
+    private MatchResultDto matchOne(WatchConfig watch) {
+        Course course = watch.getCourse();
+        List<TeeTimeDto> hits = findMatchingRows(watch).stream().map(teeTimeService::toDto).toList();
 
         return new MatchResultDto(
                 watch.getId(),

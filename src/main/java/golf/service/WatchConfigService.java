@@ -19,10 +19,15 @@ public class WatchConfigService {
 
     private final WatchConfigRepository repository;
     private final CourseRepository courseRepository;
+    private final NotificationService notificationService;
 
-    public WatchConfigService(WatchConfigRepository repository, CourseRepository courseRepository) {
+    public WatchConfigService(
+            WatchConfigRepository repository,
+            CourseRepository courseRepository,
+            NotificationService notificationService) {
         this.repository = repository;
         this.courseRepository = courseRepository;
+        this.notificationService = notificationService;
     }
 
     public List<WatchConfigDto> findAll() {
@@ -45,7 +50,10 @@ public class WatchConfigService {
             watch.setEmail(batch.email());
             watch.setActive(batch.active());
             watch.setUpdatedAt(Instant.now());
-            created.add(toDto(repository.save(watch)));
+            WatchConfig saved = repository.save(watch);
+            // 新建即发一封基准邮件，告知此刻已满足的时段（没有就不发）。
+            notificationService.sendBaseline(saved);
+            created.add(toDto(saved));
         }
         return created;
     }

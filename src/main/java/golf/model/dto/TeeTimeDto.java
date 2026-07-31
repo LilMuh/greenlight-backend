@@ -9,7 +9,7 @@ public record TeeTimeDto(
         String date,
         String time,
         int holes,
-        int players,
+        int availableSeats,
         BigDecimal price,
         boolean available) {
 }

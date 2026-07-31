@@ -41,10 +41,12 @@ public class TeeTime {
     private String timeLocal; // "18:18"
 
     private int holes;
-    private int players; // 按几人查的可订性
+
+    @Column(name = "available_seats")
+    private int availableSeats; // 该时段当前真实空位数（0–4）
 
     private BigDecimal price; // 单人 green fee，可空
-    private boolean available;
+    private boolean available; // 是否仍可订（available_seats > 0）
 
     @Column(name = "updated_at")
     private Instant updatedAt;

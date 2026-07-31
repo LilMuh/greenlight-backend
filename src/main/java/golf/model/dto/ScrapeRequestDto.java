@@ -8,6 +8,5 @@ public record ScrapeRequestDto(
         String site,
         List<String> courseIds,
         String date,
-        int holes,
-        int players) {
+        int holes) {
 }
