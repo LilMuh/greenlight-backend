@@ -10,6 +10,7 @@ import golf.model.entity.Course;
 import golf.model.entity.WatchConfig;
 import golf.repository.CourseRepository;
 import golf.repository.WatchConfigRepository;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,15 +20,15 @@ public class WatchConfigService {
 
     private final WatchConfigRepository repository;
     private final CourseRepository courseRepository;
-    private final NotificationService notificationService;
+    private final ApplicationEventPublisher eventPublisher;
 
     public WatchConfigService(
             WatchConfigRepository repository,
             CourseRepository courseRepository,
-            NotificationService notificationService) {
+            ApplicationEventPublisher eventPublisher) {
         this.repository = repository;
         this.courseRepository = courseRepository;
-        this.notificationService = notificationService;
+        this.eventPublisher = eventPublisher;
     }
 
     public List<WatchConfigDto> findAll() {
@@ -38,6 +39,7 @@ public class WatchConfigService {
     @Transactional
     public List<WatchConfigDto> create(WatchConfigBatchDto batch) {
         List<WatchConfigDto> created = new ArrayList<>();
+        List<Long> createdIds = new ArrayList<>();
         for (Long courseId : batch.courseIds()) {
             WatchConfig watch = new WatchConfig();
             watch.setCourse(loadCourse(courseId));
@@ -51,10 +53,12 @@ public class WatchConfigService {
             watch.setActive(batch.active());
             watch.setUpdatedAt(Instant.now());
             WatchConfig saved = repository.save(watch);
-            // 新建即发一封基准邮件，告知此刻已满足的时段（没有就不发）。
-            notificationService.sendBaseline(saved);
+            createdIds.add(saved.getId());
             created.add(toDto(saved));
         }
+        // 补数（抓这批关注的日期）和基准邮件都放到事务提交后异步做，
+        // 别让开浏览器抓取的几十秒卡在这个事务和 HTTP 响应里。见 WatchBootstrapListener。
+        eventPublisher.publishEvent(new WatchesCreatedEvent(List.copyOf(createdIds)));
         return created;
     }
 
@@ -62,7 +66,7 @@ public class WatchConfigService {
     @Transactional
     public WatchConfigDto update(Long id, WatchConfigDto dto) {
         WatchConfig watch = repository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("未知 watch id: " + id));
+                .orElseThrow(() -> new IllegalArgumentException("Unknown watch id: " + id));
         watch.setCourse(loadCourse(dto.courseId()));
         watch.setDateStart(dto.dateStart());
         watch.setDateEnd(dto.dateEnd());
@@ -82,7 +86,7 @@ public class WatchConfigService {
 
     private Course loadCourse(Long courseId) {
         return courseRepository.findById(courseId)
-                .orElseThrow(() -> new IllegalArgumentException("未知球场 id: " + courseId));
+                .orElseThrow(() -> new IllegalArgumentException("Unknown course id: " + courseId));
     }
 
     private WatchConfigDto toDto(WatchConfig watch) {

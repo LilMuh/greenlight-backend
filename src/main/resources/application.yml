@@ -1,6 +1,13 @@
 server:
   port: 8080
 
+# 日志按 UTF-8 输出。不写死的话 logback 跟着 JVM 默认编码走，
+# 在中文 Windows 上会变成 GBK，中文日志出去就是乱码。
+logging:
+  charset:
+    console: UTF-8
+    file: UTF-8
+
 spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/greenlight
@@ -15,6 +22,24 @@ spring:
   # 迁移不归后端管
   liquibase:
     enabled: false
+  # 邮件模板不缓存：改完 templates/mail/*.html 刷新 /api/notifications/preview 就能看到，不用重启
+  thymeleaf:
+    cache: false
+  # SMTP 连接参数，只有 greenlight.mail.mode=prod（真发邮件）时才会用到。
+  # 默认按 Gmail 填好；换服务商只改 host/port。Gmail 必须用「应用专用密码」，不是账号登录密码。
+  mail:
+    host: ${GREENLIGHT_SMTP_HOST:smtp.gmail.com}
+    port: ${GREENLIGHT_SMTP_PORT:587}
+    username: ${GREENLIGHT_SMTP_USER:}
+    password: ${GREENLIGHT_SMTP_PASSWORD:}
+    properties:
+      mail.smtp.auth: true
+      mail.smtp.starttls.enable: true
+      mail.smtp.starttls.required: true
+      # 别让 SMTP 卡死抓取线程
+      mail.smtp.connectiontimeout: 10000
+      mail.smtp.timeout: 10000
+      mail.smtp.writetimeout: 10000
 
 # 定时抓取节奏（TeeTimeScrapeTask）
 greenlight:
@@ -22,6 +47,16 @@ greenlight:
     initial-delay-ms: 0        # 启动即先抓一轮
     interval-ms: 3600000       # 之后每隔 1 小时（上一轮结束算起）
   mail:
-    # dev=只写日志不真发（本地默认）；prod=走 SMTP，另需配 spring.mail.* 和下面的 from
+    # dev=只写日志不真发（本地默认）；prod=走 SMTP 真发，需要 spring.mail.username/password
     mode: ${GREENLIGHT_MAIL_MODE:dev}
-    from: ${GREENLIGHT_MAIL_FROM:greenlight@example.com}
+    # 发件地址。Gmail 等服务商要求发件人 = 认证账号，所以默认就取 SMTP 用户名
+    from: ${GREENLIGHT_MAIL_FROM:${GREENLIGHT_SMTP_USER:greenlight@example.com}}
+    # 邮件里「Book this time」按钮的链接。占位符见 MailProperties；置空则不渲染按钮。
+    # 参数名是 2026-08-04 用 OAB 驱动真实浏览器实测的（Date / Player / Hole /
+    # TeeOffTimeMin / TeeOffTimeMax，首字母大写，跟它转给后端 API 的那套名字不同）。
+    # 点进去落到指定日期、指定人数、开球前后各 1 小时的时段列表。
+    booking-url-template: "https://{site}.cps.golf/onlineresweb/search-teetime?Date={date}&TeeOffTimeMin={timeMin}&TeeOffTimeMax={timeMax}&Player={players}&Hole={holes}"
+    # 球场地点，按 site 配。course 表没有地点列（表结构归 greenlight-database），
+    # 先用站点级的地区名顶上；查不到就不显示地点那行。
+    site-locations:
+      golfvancouver: "Vancouver, BC"

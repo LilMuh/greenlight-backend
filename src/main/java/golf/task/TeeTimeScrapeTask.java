@@ -1,6 +1,5 @@
 package golf.task;
 
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -11,14 +10,18 @@ import golf.model.dto.ScrapeRequestDto;
 import golf.model.dto.ScrapeResultDto;
 import golf.model.dto.ScrapeSummary;
 import golf.service.NotificationService;
+import golf.service.ScrapePlanService;
+import golf.service.ScrapePlanService.ScrapeJob;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
- * 触发抓取：对每个球场目标、未来若干天各发一次 POST /scrape。
+ * 触发抓取：按 ScrapePlanService 算出的计划，逐项 POST /scrape。
  * 只负责“喊 scraper 去抓+落库”，本身不碰 tee_time 数据。
+ *
+ * 抓什么完全由 watch_config 决定——没人关注的日期不抓，一条 watch 都没有就整轮跳过。
  */
 @Component
 public class TeeTimeScrapeTask {
@@ -26,28 +29,17 @@ public class TeeTimeScrapeTask {
     private static final Logger log = LoggerFactory.getLogger(TeeTimeScrapeTask.class);
 
     private static final int HOLES = 18;
-    private static final int DAYS_AHEAD = 7; // 今天 + 后 7 天（含今天共 8 天，offset 0..7）
-
-    /** 要抓的球场组：一个 site 下的一批 course slug。 */
-    enum Target {
-        GOLFVANCOUVER("cps", "golfvancouver", List.of("fraserview", "langara", "mccleery"));
-
-        final String source;
-        final String site;
-        final List<String> courses;
-
-        Target(String source, String site, List<String> courses) {
-            this.source = source;
-            this.site = site;
-            this.courses = courses;
-        }
-    }
 
     private final ScraperClient scraperClient;
+    private final ScrapePlanService scrapePlanService;
     private final NotificationService notificationService;
 
-    public TeeTimeScrapeTask(ScraperClient scraperClient, NotificationService notificationService) {
+    public TeeTimeScrapeTask(
+            ScraperClient scraperClient,
+            ScrapePlanService scrapePlanService,
+            NotificationService notificationService) {
         this.scraperClient = scraperClient;
+        this.scrapePlanService = scrapePlanService;
         this.notificationService = notificationService;
     }
 
@@ -63,38 +55,57 @@ public class TeeTimeScrapeTask {
         run();
     }
 
-    /** 跑一轮：目标 × 日期，逐个触发抓取，单个失败不影响其余。 */
+    /** 跑一轮：按计划逐项抓，抓完对比快照发通知。 */
     public ScrapeSummary run() {
-        int partitions = 0;
-        int saved = 0;
-        List<String> errors = new ArrayList<>();
-        LocalDate today = LocalDate.now();
+        List<ScrapeJob> jobs = scrapePlanService.planForActiveWatches();
+        if (jobs.isEmpty()) {
+            log.info("No active watch covers a scrapable date; skipping this round");
+            return new ScrapeSummary(0, 0, List.of());
+        }
+        log.info("Scrape plan for this round ({} jobs): {}", jobs.size(), jobs.stream()
+                .map(job -> job.site() + " " + job.date() + " " + job.courseSlugs())
+                .toList());
 
         // 抓之前先给每条 watch 拍一张「当前满足的时段」快照，作为本轮上升沿判断的基线。
+        // 某个日期这轮没进计划，它的命中集前后一致、不会产生上升沿，不会误发邮件。
         Map<Long, Set<Long>> satisfiedBeforeScrape = notificationService.snapshotSatisfying();
 
-        for (Target target : Target.values()) {
-            for (int dayOffset = 0; dayOffset <= DAYS_AHEAD; dayOffset++) {
-                LocalDate date = today.plusDays(dayOffset);
-                try {
-                    ScrapeRequestDto request = new ScrapeRequestDto(
-                            target.source, target.site, target.courses, date.toString(), HOLES);
-                    ScrapeResultDto result = scraperClient.scrape(request);
-                    saved += result.count();
-                    partitions++;
-                } catch (Exception e) {
-                    String reason = target.site + " " + date + ": " + e.getMessage();
-                    errors.add(reason);
-                    log.warn("触发抓取失败 {}", reason);
-                }
-            }
-        }
-
-        log.info("抓取触发完成：partition={} saved={} error={}", partitions, saved, errors.size());
+        ScrapeSummary summary = execute(jobs);
 
         // 抓完对比快照，只对「本轮新变得满足」的时段发通知邮件。
         notificationService.notifyRisingEdges(satisfiedBeforeScrape);
 
+        return summary;
+    }
+
+    /**
+     * 执行一批抓取计划，单项失败不影响其余。不发通知——
+     * 新建 watch 那条路径要先抓完再单独发基准邮件，不能走上升沿那套。
+     *
+     * synchronized：所有抓取都从这里过。定时轮和「新建 watch 立刻抓」是两个线程，
+     * 同时驱动同一个 OAB profile 会打架，这里串起来，后到的等前一批抓完。
+     */
+    public synchronized ScrapeSummary execute(List<ScrapeJob> jobs) {
+        int partitions = 0;
+        int saved = 0;
+        List<String> errors = new ArrayList<>();
+
+        for (ScrapeJob job : jobs) {
+            try {
+                ScrapeRequestDto request = new ScrapeRequestDto(
+                        job.source(), job.site(), job.courseSlugs(), job.date().toString(), HOLES);
+                ScrapeResultDto result = scraperClient.scrape(request);
+                saved += result.count();
+                partitions++;
+            } catch (Exception e) {
+                String reason = job.site() + " " + job.date() + ": " + e.getMessage();
+                errors.add(reason);
+                log.warn("Scrape request failed {}", reason);
+            }
+        }
+
+        log.info("Scrape round finished: planned={} partition={} saved={} error={}",
+                jobs.size(), partitions, saved, errors.size());
         return new ScrapeSummary(partitions, saved, errors);
     }
 }
