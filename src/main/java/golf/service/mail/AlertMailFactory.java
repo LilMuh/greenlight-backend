@@ -5,8 +5,12 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 import golf.model.entity.Course;
 import golf.model.entity.TeeTime;
@@ -19,13 +23,15 @@ import org.thymeleaf.spring6.SpringTemplateEngine;
  * 把「一条 watch + 一批命中时段」渲染成一封提醒邮件（标题 + HTML 正文）。
  *
  * 排版在 templates/mail/tee-time-alert.html，文案措辞在这里。分工是：
- * 所有格式化（日期写法、12 小时制、价格带币种、单复数）在 Java 做完，
+ * 所有格式化（日期写法、24 小时制、价格写法、单复数）在 Java 做完，
  * 模板只拿现成字符串摆位置——模板里没有表达式逻辑，改样式和改文案互不干扰。
+ *
+ * 正文按日期分组：一天一个块，块里按时间升序列时段，预订链接挂在分组上而不是每行一条。
  */
 @Component
 public class AlertMailFactory {
 
-    /** 两种触发场景，决定标题和引导语的措辞。 */
+    /** 两种触发场景，决定标题的措辞。 */
     public enum Kind {
         /** 新建 watch 时的基准邮件：此刻已经满足条件的时段。 */
         BASELINE,
@@ -33,14 +39,20 @@ public class AlertMailFactory {
         NEW
     }
 
-    private static final DateTimeFormatter CARD_DATE =
+    private static final DateTimeFormatter GROUP_DATE =
             DateTimeFormatter.ofPattern("EEE, MMM d", Locale.ENGLISH);
     private static final DateTimeFormatter RANGE_DATE =
             DateTimeFormatter.ofPattern("MMM d", Locale.ENGLISH);
     private static final DateTimeFormatter CLOCK =
-            DateTimeFormatter.ofPattern("h:mm a", Locale.ENGLISH);
+            DateTimeFormatter.ofPattern("HH:mm");
 
     private static final String TEMPLATE = "mail/tee-time-alert";
+
+    /** 球场名去掉这个后缀就是正文顶部那个短名（FRASERVIEW GOLF COURSE → FRASERVIEW）。 */
+    private static final String COURSE_SUFFIX = " golf course";
+
+    /** 预览行（收件箱里标题后面那截灰字）里最多提几个时段。 */
+    private static final int PREHEADER_SLOTS = 3;
 
     private final SpringTemplateEngine templateEngine;
     private final BookingLinkBuilder bookingLinkBuilder;
@@ -60,12 +72,20 @@ public class AlertMailFactory {
     }
 
     public RenderedMail render(WatchConfig watch, List<TeeTime> teeTimes, Kind kind) {
+        // 分组和链接窗口都吃「按日期、再按时间升序」这个前提，别指望调用方已经排好
+        Comparator<TeeTime> chronological = Comparator
+                .<TeeTime, LocalDate>comparing(
+                        TeeTime::getPlayDate, Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(TeeTime::getTimeLocal, Comparator.nullsLast(Comparator.naturalOrder()));
+
+        List<TeeTime> ordered = teeTimes.stream().sorted(chronological).toList();
+
         return process(
                 kind,
                 courseName(watch.getCourse()),
                 location(watch.getCourse()),
                 criteria(watch),
-                teeTimes.stream().map(teeTime -> toCard(teeTime, watch.getPlayers())).toList());
+                groupByDate(ordered, watch.getPlayers()));
     }
 
     /**
@@ -73,30 +93,43 @@ public class AlertMailFactory {
      * 供 GET /api/notifications/preview 和 POST /api/notifications/test 使用——
      * 改完模板不用等一轮抓取命中才能看到效果。
      *
-     * 三张卡片刻意覆盖了三种形态：有价格有链接、单个空位、没抓到价格。
+     * 样例刻意跨了两个日期，其中一天有两个时段：分组和「一天一条链接」都能看出来。
      */
     public RenderedMail renderSample(Kind kind) {
-        String date = LocalDate.now().plusDays(3).toString();
-        List<TeeTimeCard> cards = List.of(
-                new TeeTimeCard("Fri, Aug 7", "6:18 PM", "4 spots left", "$52.00 CAD",
-                        bookingLinkBuilder.build("golfvancouver", "cps", "fraserview", date, "18:18", 4, 18)),
-                new TeeTimeCard("Sun, Aug 9", "7:30 AM", "1 spot left", "$78.50 CAD",
-                        bookingLinkBuilder.build("golfvancouver", "cps", "fraserview", date, "07:30", 4, 18)),
-                new TeeTimeCard("Sun, Aug 9", "2:06 PM", "3 spots left", null,
-                        bookingLinkBuilder.build("golfvancouver", "cps", "fraserview", date, "14:06", 4, 18)));
+        LocalDate firstDay = LocalDate.now().plusDays(3);
+        LocalDate secondDay = LocalDate.now().plusDays(5);
+
+        TeeTimeDateGroup first = new TeeTimeDateGroup(
+                formatDate(firstDay, GROUP_DATE),
+                bookingLinkBuilder.build(
+                        "golfvancouver", "cps", "fraserview", firstDay.toString(), "18:18", "18:18", 4, 18),
+                List.of(new TeeTimeCard("18:18", "4 spots", "$52.00")));
+
+        TeeTimeDateGroup second = new TeeTimeDateGroup(
+                formatDate(secondDay, GROUP_DATE),
+                bookingLinkBuilder.build(
+                        "golfvancouver", "cps", "fraserview", secondDay.toString(), "07:30", "14:06", 4, 18),
+                List.of(
+                        new TeeTimeCard("07:30", "1 spot", "$78.50"),
+                        new TeeTimeCard("14:06", "3 spots", "$61.00")));
 
         return process(
                 kind,
                 "Fraserview Golf Course",
                 mailProperties.getSiteLocations().getOrDefault("golfvancouver", null),
-                "4 players · Aug 4 – Aug 11 · 6:00 AM – 10:00 AM · up to $90",
-                cards);
+                "4 players · Aug 4 – Aug 11 · 06:00 – 10:00 · up to $90",
+                List.of(first, second));
     }
 
-    /** 文案在这里定，模板只摆位置。标题和正文标题分开写：收件箱里那行要更短。 */
+    /** 文案在这里定，模板只摆位置。 */
     private RenderedMail process(
-            Kind kind, String courseName, String location, String criteria, List<TeeTimeCard> cards) {
-        int count = cards.size();
+            Kind kind,
+            String courseName,
+            String location,
+            String criteria,
+            List<TeeTimeDateGroup> groups) {
+
+        int count = groups.stream().mapToInt(group -> group.slots().size()).sum();
 
         String subject = courseName + ": " + switch (kind) {
             case BASELINE -> count == 1
@@ -107,39 +140,73 @@ public class AlertMailFactory {
                     : count + " new tee times just opened";
         };
 
-        String headline = switch (kind) {
-            case BASELINE -> count == 1
-                    ? "1 tee time matches your alert"
-                    : count + " tee times match your alert";
-            case NEW -> count == 1
-                    ? "A new tee time just opened"
-                    : count + " new tee times just opened";
-        };
-
-        String intro = switch (kind) {
-            case BASELINE -> "Here's what's open right now.";
-            case NEW -> "These became bookable since the last check.";
-        };
-
         Context context = new Context(Locale.ENGLISH);
         context.setVariable("subject", subject);
-        context.setVariable("headline", headline);
-        context.setVariable("intro", intro);
-        context.setVariable("courseName", courseName);
+        context.setVariable("preheader", preheader(groups));
+        context.setVariable("courseLabel", courseLabel(courseName));
         context.setVariable("location", location);
+        context.setVariable("groups", groups);
+        context.setVariable("footerNote", "You set up a GreenLight alert for " + courseName + ".");
         context.setVariable("criteria", criteria);
-        context.setVariable("cards", cards);
 
         return new RenderedMail(subject, templateEngine.process(TEMPLATE, context));
     }
 
-    private TeeTimeCard toCard(TeeTime teeTime, int players) {
-        return new TeeTimeCard(
-                formatDate(teeTime.getPlayDate(), CARD_DATE),
-                formatClock(teeTime.getTimeLocal()),
-                seats(teeTime.getAvailableSeats()),
-                price(teeTime.getPrice()),
-                bookingLinkBuilder.buildFor(teeTime, players));
+    /** 按开球日期分组，组内保持时间升序；预订链接一天一条，窗口覆盖当天首尾两个时段。 */
+    private List<TeeTimeDateGroup> groupByDate(List<TeeTime> ordered, int players) {
+        // 按格式化后的日期做键：play_date 理论上可能为空，groupingBy 不收 null 键
+        Map<String, List<TeeTime>> byDate = new LinkedHashMap<>();
+        for (TeeTime teeTime : ordered) {
+            byDate.computeIfAbsent(formatDate(teeTime.getPlayDate(), GROUP_DATE), key -> new ArrayList<>())
+                    .add(teeTime);
+        }
+
+        List<TeeTimeDateGroup> groups = new ArrayList<>(byDate.size());
+        byDate.forEach((date, slots) -> groups.add(new TeeTimeDateGroup(
+                date,
+                bookingLinkBuilder.buildForDay(slots, players),
+                slots.stream().map(AlertMailFactory::toCard).toList())));
+        return groups;
+    }
+
+    /**
+     * 正文第一个元素是隐藏的预览行：收件箱列表里标题后面跟的那截灰字。
+     * 不给的话客户端会自己抓正文开头的可见文字，这封邮件开头是球场名，读起来是重复的。
+     */
+    private static String preheader(List<TeeTimeDateGroup> groups) {
+        StringBuilder text = new StringBuilder();
+        int used = 0;
+
+        for (TeeTimeDateGroup group : groups) {
+            if (used >= PREHEADER_SLOTS) {
+                break;
+            }
+            List<String> times = new ArrayList<>();
+            for (TeeTimeCard card : group.slots()) {
+                if (used >= PREHEADER_SLOTS) {
+                    break;
+                }
+                times.add(card.time());
+                used++;
+            }
+            if (times.isEmpty()) {
+                continue;
+            }
+            if (!text.isEmpty()) {
+                text.append(" · ");
+            }
+            text.append(group.date()).append(' ').append(joinTimes(times));
+        }
+
+        return text.isEmpty() ? "" : text + " — inside your alert window.";
+    }
+
+    /** ["07:30","14:06"] → "07:30 and 14:06"。 */
+    private static String joinTimes(List<String> times) {
+        if (times.size() == 1) {
+            return times.get(0);
+        }
+        return String.join(", ", times.subList(0, times.size() - 1)) + " and " + times.get(times.size() - 1);
     }
 
     /** 页脚那行「你为什么会收到这封信」：把 watch 的筛选条件平铺出来。 */
@@ -169,27 +236,46 @@ public class AlertMailFactory {
         if (course == null || course.getSite() == null) {
             return null;
         }
-        // course 表没有地点这一列，先按 site 查配置；查不到返回 null，模板不渲染这行
+        // course 表没有地点这一列，先按 site 查配置；查不到返回 null，模板就只显示球场名
         return mailProperties.getSiteLocations().get(course.getSite());
+    }
+
+    private static TeeTimeCard toCard(TeeTime teeTime) {
+        return new TeeTimeCard(
+                formatClock(teeTime.getTimeLocal()),
+                seats(teeTime.getAvailableSeats()),
+                price(teeTime.getPrice()));
     }
 
     private static String courseName(Course course) {
         return course == null || course.getName() == null ? "Your course" : course.getName();
     }
 
+    /**
+     * 正文顶部那行只用短名，全大写：「FRASERVIEW GOLF COURSE」在 16px Arial Black
+     * 加 0.10em 字距下会顶到 600px 宽度的边。页脚保留完整球场名。
+     */
+    private static String courseLabel(String courseName) {
+        String label = courseName;
+        if (label.toLowerCase(Locale.ENGLISH).endsWith(COURSE_SUFFIX)) {
+            label = label.substring(0, label.length() - COURSE_SUFFIX.length()).strip();
+        }
+        return label.toUpperCase(Locale.ENGLISH);
+    }
+
     private static String seats(int availableSeats) {
-        return availableSeats == 1 ? "1 spot left" : availableSeats + " spots left";
+        return availableSeats == 1 ? "1 spot" : availableSeats + " spots";
     }
 
     private static String price(BigDecimal price) {
-        return price == null ? null : "$" + price.setScale(2, RoundingMode.HALF_UP).toPlainString() + " CAD";
+        return price == null ? null : "$" + price.setScale(2, RoundingMode.HALF_UP).toPlainString();
     }
 
     private static String formatDate(LocalDate date, DateTimeFormatter formatter) {
         return date == null ? "" : formatter.format(date);
     }
 
-    /** "18:18" → "6:18 PM"。解析不了就原样返回，不为了排版把内容弄丢。 */
+    /** "18:18" → "18:18"，顺手把 "6:18" 这类补齐成两位。解析不了就原样返回，不为了排版把内容弄丢。 */
     private static String formatClock(String timeLocal) {
         if (timeLocal == null || timeLocal.isBlank()) {
             return "";

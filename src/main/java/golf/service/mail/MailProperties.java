@@ -21,21 +21,23 @@ public class MailProperties {
     private String from = "";
 
     /**
-     * 「Book this time」按钮的链接模板。占位符：
+     * 邮件里每个日期分组那条「BOOK →」链接的模板。占位符：
      *   {site}    = tee_time.site，如 golfvancouver
      *   {source}  = tee_time.source，如 cps
      *   {slug}    = course.slug
      *   {date}    = 开球日期 ISO，如 2026-08-07
-     *   {timeMin} / {timeMax} = 开球时间前后各 1 小时，小数小时
+     *   {timeMin} / {timeMax} = 当天最早那个时段往前 1 小时到最晚那个往后 1 小时，小数小时
      *   {players} = watch 的人数（时段本身没有这个概念）
      *   {holes}   = tee_time.holes
-     * 置空则邮件里不出现预订按钮。CPS 那边各参数对应什么名字见 BookingLinkBuilder。
+     * 置空则邮件里不出现预订链接。CPS 那边各参数对应什么名字见 BookingLinkBuilder。
      */
     private String bookingUrlTemplate = "";
 
     /**
      * 球场地点，按 site 配。course 表目前没有地点这一列（表结构归 greenlight-database 管），
-     * 这里先用站点级的展示名顶上；查不到就不显示地点那一行。
+     * 这里先用站点级的展示名顶上。
+     *
+     * 改版后的提醒邮件不再显示地点，这项暂时没人读；配置键先留着，等确定不会再用到再删。
      */
     private Map<String, String> siteLocations = new HashMap<>();
 
