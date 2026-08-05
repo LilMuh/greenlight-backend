@@ -45,7 +45,7 @@ spring:
 greenlight:
   scrape:
     initial-delay-ms: 0        # 启动即先抓一轮
-    interval-ms: 3600000       # 之后每隔 1 小时（上一轮结束算起）
+    interval-ms: 1800000       # 之后每隔 30 分钟（上一轮结束算起）
   mail:
     # dev=只写日志不真发（本地默认）；prod=走 SMTP 真发，需要 spring.mail.username/password
     mode: ${GREENLIGHT_MAIL_MODE:dev}

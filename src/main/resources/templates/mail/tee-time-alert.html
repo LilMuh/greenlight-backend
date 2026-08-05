@@ -5,123 +5,112 @@
 
   写法受邮件客户端限制，不是普通网页那一套：
     - 布局用 <table>，不用 flex/grid（Outlook 桌面版走 Word 排版引擎，不支持）
-    - 样式全部内联，不写 <style> 选择器（Gmail 会剥掉大部分）
-    - 不引外部字体、图片、CSS（很多客户端默认拦截远程资源）
+    - 样式全部内联；<head> 里唯一那条 @media 只把窄屏的左右留白从 32px 收到 20px，
+      整块被 Gmail 剥掉也不影响阅读
+    - 不引外部字体、CSS，也不用图片：视觉全靠色块、1px 细线和字体本身
+    - 每个文字格都带 mso-line-height-rule:exactly，每张表每个格都给显式宽度
     - 宽度锁 600px，是各家客户端阅读区的安全宽度
+
+  结构：品牌条 / 球场短名 / 按日期分组的时段块（一天一条预订链接）/ 页脚。
 */-->
-<html xmlns:th="http://www.thymeleaf.org">
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light">
   <title th:text="${subject}">GreenLight</title>
+  <style>
+    @media only screen and (max-width:480px) {
+      .gutter { padding-left:20px !important; padding-right:20px !important; }
+    }
+  </style>
+  <!--[if mso]>
+  <style>body,table,td,a,div,span{font-family:Arial,Helvetica,sans-serif !important;}</style>
+  <![endif]-->
 </head>
-<body style="margin:0; padding:0; background-color:#f4f5f7; -webkit-font-smoothing:antialiased;">
+<body style="margin:0; padding:0; background-color:#efe9df; -webkit-font-smoothing:antialiased;">
 
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
-       style="background-color:#f4f5f7;">
+<!--/* 收件箱列表里标题后面那截灰字：正文里不可见 */-->
+<span style="display:none; font-size:1px; color:#efe9df; line-height:1px; max-height:0; max-width:0; opacity:0; overflow:hidden;"
+      th:text="${preheader}">Fri, Aug 7 18:18 · Sun, Aug 9 07:30 and 14:06 — inside your alert window.</span>
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#efe9df;">
   <tr>
     <td align="center" style="padding:24px 12px;">
 
       <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600"
-             style="width:100%; max-width:600px; background-color:#ffffff; border:1px solid #e5e7eb; border-radius:12px;">
+             style="width:100%; max-width:600px; background-color:#ffffff;">
 
-        <!--/* 顶部细色条：唯一的品牌色块，比整块 header 更克制 */-->
+        <!--/* 品牌条：整封邮件唯一的色块 */-->
         <tr>
-          <td style="height:4px; line-height:4px; font-size:0; background-color:#1a7f4f;
-                     border-radius:12px 12px 0 0;">&nbsp;</td>
+          <td bgcolor="#e6ede8" class="gutter"
+              style="background-color:#e6ede8; padding:16px 32px; font-family:Arial,Helvetica,sans-serif; font-size:12px; line-height:16px; mso-line-height-rule:exactly; letter-spacing:0.16em; color:#5d7d6c;">GREENLIGHT</td>
         </tr>
 
+        <!--/*
+          球场短名（Java 那边已经去掉「Golf Course」并转成大写），地点跟在后面。
+          地点用页脚同一档的次要灰小字，并把这一格的字距和粗细还原成常规，
+          免得跟着球场名一起被拉开。查不到地点时整段不渲染。
+        */-->
         <tr>
-          <td style="padding:24px 32px 8px 32px;
-                     font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
-            <span style="font-size:12px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#1a7f4f;">
-              GreenLight
-            </span>
-          </td>
+          <td class="gutter"
+              style="padding:24px 32px 0 32px; font-family:'Arial Black','Arial Bold',Arial,Helvetica,sans-serif; font-size:16px; line-height:20px; mso-line-height-rule:exactly; letter-spacing:0.10em; font-weight:bold; color:#1a7f4f;"><span th:text="${courseLabel}">FRASERVIEW</span><span th:if="${location}" style="font-family:Arial,Helvetica,sans-serif; font-size:12px; line-height:20px; mso-line-height-rule:exactly; letter-spacing:normal; font-weight:normal; color:#6b7280;">&nbsp;&nbsp;·&nbsp;&nbsp;<span th:text="${location}">Vancouver, BC</span></span></td>
         </tr>
 
-        <!--/* 标题区：命中数量放在最显眼的位置，球场名和地点跟在下面 */-->
-        <tr>
-          <td style="padding:0 32px;
-                     font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
-            <div style="font-size:22px; line-height:1.3; font-weight:700; color:#111827; margin:0 0 6px 0;"
-                 th:text="${headline}">3 new tee times just opened</div>
-            <div style="font-size:15px; line-height:1.4; color:#374151;" th:text="${courseName}">Fraserview</div>
-            <div th:if="${location}" style="font-size:13px; line-height:1.4; color:#6b7280; padding-top:2px;"
-                 th:text="${location}">Vancouver, BC</div>
-            <div style="font-size:14px; line-height:1.5; color:#6b7280; padding-top:12px;"
-                 th:text="${intro}">These became bookable since the last check.</div>
-          </td>
-        </tr>
+        <!--/* 一天一个块 */-->
+        <tr th:each="group : ${groups}">
+          <td class="gutter" style="padding:20px 32px 0 32px;">
+            <table role="presentation" width="536" cellpadding="0" cellspacing="0" border="0" style="width:100%;">
 
-        <!--/* 时段卡片 */-->
-        <tr>
-          <td style="padding:20px 32px 8px 32px;">
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
-              <tr th:each="card : ${cards}">
-                <td style="padding-bottom:12px;">
-
-                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
-                         style="border:1px solid #e5e7eb; border-radius:10px; background-color:#ffffff;">
+              <!--/* 日期 + 当天那条预订链接。没配链接模板时右边那格整个不渲染 */-->
+              <tr>
+                <td style="padding:0 0 8px 0;">
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
                     <tr>
-                      <td style="padding:16px 18px 0 18px;
-                                 font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
-
-                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
-                          <tr>
-                            <!--/* 左：日期 + 时间。时间字号最大——扫一眼要先看到几点 */-->
-                            <td align="left" valign="top" style="font-size:0;">
-                              <div style="font-size:13px; line-height:1.4; color:#6b7280;"
-                                   th:text="${card.date}">Fri, Aug 7</div>
-                              <div style="font-size:20px; line-height:1.3; font-weight:700; color:#111827; padding-top:2px;"
-                                   th:text="${card.time}">6:18 PM</div>
-                            </td>
-                            <!--/* 右：空位 + 价格 */-->
-                            <td align="right" valign="top" style="font-size:0;">
-                              <div style="font-size:13px; line-height:1.4; color:#6b7280;"
-                                   th:text="${card.seats}">4 spots left</div>
-                              <div th:if="${card.price}"
-                                   style="font-size:15px; line-height:1.3; font-weight:600; color:#111827; padding-top:3px;"
-                                   th:text="${card.price}">$52.00 CAD</div>
-                            </td>
-                          </tr>
-                        </table>
-
-                      </td>
-                    </tr>
-                    <tr th:if="${card.bookingUrl}">
-                      <td style="padding:14px 18px 16px 18px;">
-                        <a th:href="${card.bookingUrl}" href="#"
-                           style="display:inline-block; background-color:#1a7f4f; color:#ffffff;
-                                  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
-                                  font-size:14px; font-weight:600; line-height:1; text-decoration:none;
-                                  padding:11px 18px; border-radius:8px;">Book this time&nbsp;&rarr;</a>
-                      </td>
-                    </tr>
-                    <!--/* 没有预订链接时补一点底部留白，卡片不至于贴着边 */-->
-                    <tr th:unless="${card.bookingUrl}">
-                      <td style="height:16px; line-height:16px; font-size:0;">&nbsp;</td>
+                      <td align="left" valign="bottom"
+                          style="font-family:'Palatino Linotype','Book Antiqua',Palatino,Georgia,serif; font-size:18px; line-height:22px; mso-line-height-rule:exactly; font-weight:bold; color:#201e1d;"
+                          th:text="${group.date}">Fri, Aug 7</td>
+                      <!--/* 下划线只给 BOOK 这个词：连着后面那段空隙和箭头一起划会拖出一条空尾巴 */-->
+                      <td th:if="${group.bookingUrl}" align="right" valign="bottom"
+                          style="font-family:Arial,Helvetica,sans-serif; font-size:12px; line-height:20px; mso-line-height-rule:exactly; letter-spacing:0.06em;">
+                        <a th:href="${group.bookingUrl}" href="#"
+                           style="color:#1a7f4f; text-decoration:none;"><span style="text-decoration:underline;">BOOK</span> &nbsp;&rarr;</a></td>
                     </tr>
                   </table>
-
                 </td>
               </tr>
+
+              <!--/* 时段行：时间 / 空位 / 价格三列，各自带 width 属性给 Outlook、百分比给手机 */-->
+              <tr th:each="card : ${group.slots}">
+                <td style="padding:0;">
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                    <tr>
+                      <td width="200" align="left" valign="middle"
+                          style="width:40%; border-top:1px solid #f0ebe2; padding:8px 0; font-family:Arial,Helvetica,sans-serif; font-size:15px; line-height:20px; mso-line-height-rule:exactly; color:#201e1d;"
+                          th:text="${card.time}">18:18</td>
+                      <td width="176" align="left" valign="middle"
+                          style="width:30%; border-top:1px solid #f0ebe2; padding:8px 0; font-family:Arial,Helvetica,sans-serif; font-size:12px; line-height:20px; mso-line-height-rule:exactly; color:#6b7280;"
+                          th:text="${card.seats}">4 spots</td>
+                      <td width="160" align="right" valign="middle"
+                          style="width:30%; border-top:1px solid #f0ebe2; padding:8px 0; font-family:Arial,Helvetica,sans-serif; font-size:15px; line-height:20px; mso-line-height-rule:exactly; color:#201e1d;"
+                          th:text="${card.price}">$52.00</td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+
             </table>
           </td>
         </tr>
 
         <!--/* 页脚：说明为什么会收到这封信，并把 watch 的筛选条件平铺出来 */-->
         <tr>
-          <td style="padding:8px 32px 24px 32px;">
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+          <td class="gutter" style="padding:24px 32px 24px 32px;">
+            <table role="presentation" width="536" cellpadding="0" cellspacing="0" border="0" style="width:100%;">
               <tr>
-                <td style="border-top:1px solid #e5e7eb; padding-top:16px;
-                           font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
-                           font-size:12px; line-height:1.6; color:#9ca3af;">
-                  You're getting this because you set up a GreenLight alert for
-                  <span style="color:#6b7280;" th:text="${courseName}">Fraserview</span>.<br>
-                  <span th:text="${criteria}">4 players · Aug 4 – Aug 11 · 6:00 AM – 10:00 AM · up to $90</span>
+                <td style="border-top:1px solid #e5e1d8; padding:12px 0 0 0; font-family:Arial,Helvetica,sans-serif; font-size:12px; line-height:18px; mso-line-height-rule:exactly; color:#6b7280;">
+                  <span th:text="${footerNote}">You set up a GreenLight alert for Fraserview Golf Course.</span><br>
+                  <span th:text="${criteria}">4 players · Aug 4 – Aug 11 · 06:00 – 10:00 · up to $90</span>
                 </td>
               </tr>
             </table>

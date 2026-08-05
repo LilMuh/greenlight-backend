@@ -1,6 +1,7 @@
 package golf.service.mail;
 
 import java.time.LocalTime;
+import java.util.List;
 import java.util.Locale;
 
 import golf.model.entity.TeeTime;
@@ -9,11 +10,11 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 /**
- * 拼「Book this time」按钮的链接。
+ * 拼日期分组上那条「BOOK →」链接。
  *
  * tee_time 表里没有存预订页 URL（表结构归 greenlight-database 管），所以只能按
  * source/site/slug 反推。模板写在配置里（greenlight.mail.booking-url-template），
- * 换站点或改深链参数不用动代码；置空则邮件里不出现预订按钮。
+ * 换站点或改深链参数不用动代码；置空则邮件里不出现预订链接。
  *
  * CPS 搜索页的深链参数是 2026-08-04 用 OAB 驱动真实浏览器实测出来的：SPA 的
  * 参数名枚举里是 Date / Player / Hole / TeeOffTimeMin / TeeOffTimeMax（注意首字母大写，
@@ -22,6 +23,9 @@ import org.springframework.stereotype.Component;
  *
  * 时间窗口给小数小时，页面会截断到整点（17.3 → 17），所以前后各放 1 小时后
  * 实际落地会比 1 小时略宽——目标时段一定还在窗口内，够用。
+ *
+ * 一天一条链接，窗口从当天最早那个命中时段往前 1 小时到最晚那个往后 1 小时：
+ * 落地页一次列出这一天所有想看的时段，不用为每个时段各点一次。
  */
 @Component
 public class BookingLinkBuilder {
@@ -41,35 +45,49 @@ public class BookingLinkBuilder {
     }
 
     /**
-     * 没配模板就返回 null，模板里据此不渲染按钮。
+     * 同一天的一批时段拼一条链接。没配模板就返回 null，模板里据此不渲染 BOOK 链接。
      * players 来自 watch（时段本身没有「几个人要打」这个概念），落地页据此预选人数。
+     *
+     * slots 必须非空且按时间升序——首尾两条就是窗口的两端，调用方（AlertMailFactory）
+     * 分组前已经排好序。
      */
-    public String buildFor(TeeTime teeTime, int players) {
+    public String buildForDay(List<TeeTime> slots, int players) {
+        TeeTime first = slots.get(0);
+        TeeTime last = slots.get(slots.size() - 1);
         return build(
-                teeTime.getSite(),
-                teeTime.getSource(),
-                teeTime.getCourse() == null ? null : teeTime.getCourse().getSlug(),
-                String.valueOf(teeTime.getPlayDate()),
-                teeTime.getTimeLocal(),
+                first.getSite(),
+                first.getSource(),
+                first.getCourse() == null ? null : first.getCourse().getSlug(),
+                String.valueOf(first.getPlayDate()),
+                first.getTimeLocal(),
+                last.getTimeLocal(),
                 players,
-                teeTime.getHoles());
+                first.getHoles());
     }
 
     /** 显式参数版：给预览的样例数据用（TeeTime 是只读实体，造不出假对象）。 */
     public String build(
-            String site, String source, String slug, String isoDate, String timeLocal, int players, int holes) {
+            String site,
+            String source,
+            String slug,
+            String isoDate,
+            String earliestTimeLocal,
+            String latestTimeLocal,
+            int players,
+            int holes) {
         String template = mailProperties.getBookingUrlTemplate();
         if (template == null || template.isBlank()) {
             return null;
         }
-        double[] window = timeWindow(timeLocal);
+        double min = timeWindow(earliestTimeLocal)[0];
+        double max = timeWindow(latestTimeLocal)[1];
         return template
                 .replace("{site}", blankIfNull(site))
                 .replace("{source}", blankIfNull(source))
                 .replace("{slug}", blankIfNull(slug))
                 .replace("{date}", blankIfNull(isoDate))
-                .replace("{timeMin}", decimalHours(window[0]))
-                .replace("{timeMax}", decimalHours(window[1]))
+                .replace("{timeMin}", decimalHours(min))
+                .replace("{timeMax}", decimalHours(max))
                 .replace("{players}", String.valueOf(players))
                 .replace("{holes}", String.valueOf(holes));
     }
