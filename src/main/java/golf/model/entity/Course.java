@@ -28,6 +28,9 @@ public class Course {
     private String source; // "cps"
     private String site; // "golfvancouver"
 
+    @Column(name = "image_url")
+    private String imageUrl; // 照片地址，可空；前端原样塞进 <img src>
+
     @Column(name = "updated_at")
     private Instant updatedAt;
 }
