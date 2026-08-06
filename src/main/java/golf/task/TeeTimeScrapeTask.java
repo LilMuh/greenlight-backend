@@ -9,6 +9,7 @@ import golf.client.ScraperClient;
 import golf.model.dto.ScrapeRequestDto;
 import golf.model.dto.ScrapeResultDto;
 import golf.model.dto.ScrapeSummary;
+import golf.service.CourseInfoService;
 import golf.service.NotificationService;
 import golf.service.ScrapePlanService;
 import golf.service.ScrapePlanService.ScrapeJob;
@@ -33,14 +34,17 @@ public class TeeTimeScrapeTask {
     private final ScraperClient scraperClient;
     private final ScrapePlanService scrapePlanService;
     private final NotificationService notificationService;
+    private final CourseInfoService courseInfoService;
 
     public TeeTimeScrapeTask(
             ScraperClient scraperClient,
             ScrapePlanService scrapePlanService,
-            NotificationService notificationService) {
+            NotificationService notificationService,
+            CourseInfoService courseInfoService) {
         this.scraperClient = scraperClient;
         this.scrapePlanService = scrapePlanService;
         this.notificationService = notificationService;
+        this.courseInfoService = courseInfoService;
     }
 
     /**
@@ -92,11 +96,15 @@ public class TeeTimeScrapeTask {
 
         for (ScrapeJob job : jobs) {
             try {
+                // 顺带把过期的球场信息刷一遍。名单由后端算、结果由后端写，scraper 只负责抓。
+                // 第一个 job 写回后 updated_at 就变新了，后面几个 job 查出来是空的——天然只跑一次。
                 ScrapeRequestDto request = new ScrapeRequestDto(
-                        job.source(), job.site(), job.courseSlugs(), job.date().toString(), HOLES);
+                        job.source(), job.site(), job.courseSlugs(), job.date().toString(), HOLES,
+                        courseInfoService.findStale(job.courseSlugs()));
                 ScrapeResultDto result = scraperClient.scrape(request);
                 saved += result.count();
                 partitions++;
+                applyCourseInfo(result);
             } catch (Exception e) {
                 String reason = job.site() + " " + job.date() + ": " + e.getMessage();
                 errors.add(reason);
@@ -107,5 +115,18 @@ public class TeeTimeScrapeTask {
         log.info("Scrape round finished: planned={} partition={} saved={} error={}",
                 jobs.size(), partitions, saved, errors.size());
         return new ScrapeSummary(partitions, saved, errors);
+    }
+
+    /**
+     * 写回球场的地址/评分。单独 catch 而不是并进上面那个 try——
+     * 时段已经落库了，球场信息只是装饰，写它失败不该把这个 job 记成抓取失败。
+     * 跳过的这次不写 updated_at，下一轮还会再来一遍。
+     */
+    private void applyCourseInfo(ScrapeResultDto result) {
+        try {
+            courseInfoService.apply(result.courseInfos());
+        } catch (Exception e) {
+            log.warn("Course info write failed, tee times were saved fine: {}", e.getMessage());
+        }
     }
 }

@@ -23,6 +23,6 @@ public class CourseService {
 
     private CourseDto toDto(Course course) {
         return new CourseDto(course.getId(), course.getSlug(), course.getName(), course.getSource(), course.getSite(),
-                course.getImageUrl());
+                course.getImageUrl(), course.getAddress(), course.getRating(), course.getRatingCount());
     }
 }

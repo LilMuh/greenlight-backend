@@ -14,7 +14,11 @@ import org.springframework.stereotype.Service;
 
 /**
  * 匹配引擎（只读）：把每条启用中的 watch_config 和已落库的 tee_time 对上，
- * 算出符合条件的空位。目前只负责“算命中”，不发通知——通知留给后续 M3。
+ * 算出符合条件的空位。只负责“算命中”，什么时候发邮件归 NotificationService。
+ *
+ * 两个出口共用同一个查询（findMatchingRows）：
+ *   - findAllMatches   → GET /api/matches，给前端卡片上那个「N matching now」角标
+ *   - findMatchingRows → NotificationService 的基准邮件和上升沿判断都拿它当数据源
  */
 @Service
 public class WatchMatchService {

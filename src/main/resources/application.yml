@@ -46,6 +46,11 @@ greenlight:
   scrape:
     initial-delay-ms: 0        # 启动即先抓一轮
     interval-ms: 1800000       # 之后每隔 30 分钟（上一轮结束算起）
+  # 球场的地址/评分（Google Maps）多久刷一次。不是独立定时器——
+  # 挂在每轮抓取上，超过这个天数的球场会被捎带着刷新一次。见 CourseInfoService。
+  # 地址还是空的球场不受这个限制，下一轮抓取就会去补。
+  course-info:
+    max-age-days: 7
   mail:
     # dev=只写日志不真发（本地默认）；prod=走 SMTP 真发，需要 spring.mail.username/password
     mode: ${GREENLIGHT_MAIL_MODE:dev}
