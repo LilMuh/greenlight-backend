@@ -37,7 +37,8 @@ public class MailProperties {
      * 球场地点，按 site 配。course 表目前没有地点这一列（表结构归 greenlight-database 管），
      * 这里先用站点级的展示名顶上。
      *
-     * 改版后的提醒邮件不再显示地点，这项暂时没人读；配置键先留着，等确定不会再用到再删。
+     * 邮件正文顶部「球场短名 · 地点」那行的后半截，见 AlertMailFactory#location。
+     * 查不到就返回 null，模板里那一段整个不渲染，只剩球场名。
      */
     private Map<String, String> siteLocations = new HashMap<>();
 

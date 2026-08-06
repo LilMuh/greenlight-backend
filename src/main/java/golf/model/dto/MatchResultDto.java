@@ -4,7 +4,7 @@ import java.util.List;
 
 /**
  * 一条 watch 当前命中的结果：watch 摘要 + 命中的时段列表。
- * 只读展示用——先把“哪些空位符合这条关注”算出来给前端看，暂不发通知。
+ * 只读展示用，通知归 NotificationService（两边共用 WatchMatchService#findMatchingRows）。
  */
 public record MatchResultDto(
         Long watchId,
