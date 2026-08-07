@@ -169,3 +169,13 @@ Note the capitalisation: the page reads `Date` / `Player` / `Hole` /
 URL silently does nothing.
 
 > The Gradle wrapper jar is generated on first import in IntelliJ (or `gradle wrapper`).
+
+## License
+
+[GNU Affero General Public License v3.0](LICENSE).
+
+You may use, modify and redistribute this code. The Affero clause adds one
+condition on top of the GPL: if you run a modified version as a network service,
+you must offer its source to the people using it.
+
+All four GreenLight repositories are under the same license.
