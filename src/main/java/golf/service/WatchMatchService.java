@@ -1,6 +1,7 @@
 package golf.service;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 
 import golf.model.dto.MatchResultDto;
@@ -45,18 +46,27 @@ public class WatchMatchService {
 
     /**
      * 一条 watch 当前命中的原始行（含 id / 空位数），供匹配展示和通知去重共用。
-     * 条件：球场、日期区间、时间区间、空位数 ≥ 需求人数、价格 ≤ 上限、仍可订。
+     * 条件：球场、关注的星期落在窗口内的那几天、时间区间、空位数 ≥ 需求人数、
+     * 价格 ≤ 上限、仍可订。
+     *
+     * 日期用 WatchWindow 现算而不是「play_date 的星期等于关注的星期」：
+     * 后者会把库里遗留的过去那些周六一并捞出来，发一封约不到的邮件。
      */
     public List<TeeTime> findMatchingRows(WatchConfig watch) {
+        List<LocalDate> dates = WatchWindow.upcomingDates(watch);
+        if (dates.isEmpty()) {
+            // 一个星期都没勾，IN () 是不合法的 SQL，直接短路
+            return List.of();
+        }
+
         Course course = watch.getCourse();
         // maxPrice 存的是加元整数，tee_time.price 是 BigDecimal，比较前统一成 BigDecimal。
         BigDecimal maxPrice = BigDecimal.valueOf(watch.getMaxPrice());
 
         return teeTimeRepository
-                .findByCourse_IdAndPlayDateBetweenAndTimeLocalBetweenAndAvailableSeatsGreaterThanEqualAndPriceLessThanEqualAndAvailableTrueOrderByPlayDateAscTimeLocalAsc(
+                .findByCourse_IdAndPlayDateInAndTimeLocalBetweenAndAvailableSeatsGreaterThanEqualAndPriceLessThanEqualAndAvailableTrueOrderByPlayDateAscTimeLocalAsc(
                         course.getId(),
-                        watch.getDateStart(),
-                        watch.getDateEnd(),
+                        dates,
                         watch.getTimeStart(),
                         watch.getTimeEnd(),
                         watch.getPlayers(),

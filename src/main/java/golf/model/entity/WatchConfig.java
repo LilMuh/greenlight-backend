@@ -1,9 +1,12 @@
 package golf.model.entity;
 
+import java.time.DayOfWeek;
 import java.time.Instant;
-import java.time.LocalDate;
+import java.util.Set;
 
+import golf.model.Weekdays;
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -34,11 +37,14 @@ public class WatchConfig {
     @JoinColumn(name = "course_id")
     private Course course; // 关注的球场
 
-    @Column(name = "date_start")
-    private LocalDate dateStart;
-
-    @Column(name = "date_end")
-    private LocalDate dateEnd;
+    /**
+     * 关注的星期，如 {SATURDAY, SUNDAY}；库里存成 "SAT,SUN" 一列文本。
+     * 关注的是「每个周六」这种长期成立的事，不是某段会过期的日期区间——
+     * 具体抓哪几天由 WatchWindow 按今天往后推算，见那里。
+     */
+    @Convert(converter = Weekdays.Converter.class)
+    @Column(name = "weekdays")
+    private Set<DayOfWeek> weekdays;
 
     @Column(name = "time_start")
     private String timeStart; // "06:00"

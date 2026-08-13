@@ -2,16 +2,21 @@ package golf.service.mail;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import java.time.format.TextStyle;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
+import golf.model.Weekdays;
 import golf.model.entity.Course;
 import golf.model.entity.TeeTime;
 import golf.model.entity.WatchConfig;
@@ -41,8 +46,6 @@ public class AlertMailFactory {
 
     private static final DateTimeFormatter GROUP_DATE =
             DateTimeFormatter.ofPattern("EEE, MMM d", Locale.ENGLISH);
-    private static final DateTimeFormatter RANGE_DATE =
-            DateTimeFormatter.ofPattern("MMM d", Locale.ENGLISH);
     private static final DateTimeFormatter CLOCK =
             DateTimeFormatter.ofPattern("HH:mm");
 
@@ -117,7 +120,7 @@ public class AlertMailFactory {
                 kind,
                 "Fraserview Golf Course",
                 mailProperties.getSiteLocations().getOrDefault("golfvancouver", null),
-                "4 players · Aug 4 – Aug 11 · 06:00 – 10:00 · up to $90",
+                "4 players · Sat, Sun · 06:00 – 10:00 · up to $90",
                 List.of(first, second));
     }
 
@@ -214,10 +217,9 @@ public class AlertMailFactory {
         StringBuilder text = new StringBuilder();
         text.append(watch.getPlayers() == 1 ? "1 player" : watch.getPlayers() + " players");
 
-        String dateStart = formatDate(watch.getDateStart(), RANGE_DATE);
-        String dateEnd = formatDate(watch.getDateEnd(), RANGE_DATE);
-        if (!dateStart.isEmpty() && !dateEnd.isEmpty()) {
-            text.append(" · ").append(dateStart).append(" – ").append(dateEnd);
+        String weekdays = formatWeekdays(watch.getWeekdays());
+        if (!weekdays.isEmpty()) {
+            text.append(" · ").append(weekdays);
         }
 
         String from = formatClock(watch.getTimeStart());
@@ -273,6 +275,22 @@ public class AlertMailFactory {
 
     private static String formatDate(LocalDate date, DateTimeFormatter formatter) {
         return date == null ? "" : formatter.format(date);
+    }
+
+    /**
+     * {SATURDAY, SUNDAY} → "Sat, Sun"，七天全勾时缩成 "Every day"——
+     * 把七个缩写全列出来只是在告诉收信人「没做任何筛选」，不如直接说这句。
+     */
+    private static String formatWeekdays(Set<DayOfWeek> weekdays) {
+        if (weekdays == null || weekdays.isEmpty()) {
+            return "";
+        }
+        if (weekdays.size() == DayOfWeek.values().length) {
+            return "Every day";
+        }
+        return Weekdays.sorted(weekdays).stream()
+                .map(day -> day.getDisplayName(TextStyle.SHORT, Locale.ENGLISH))
+                .collect(Collectors.joining(", "));
     }
 
     /** "18:18" → "18:18"，顺手把 "6:18" 这类补齐成两位。解析不了就原样返回，不为了排版把内容弄丢。 */
