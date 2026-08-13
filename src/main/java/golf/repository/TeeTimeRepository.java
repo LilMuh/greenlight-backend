@@ -2,6 +2,7 @@ package golf.repository;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 
 import golf.model.entity.TeeTime;
@@ -18,14 +19,14 @@ public interface TeeTimeRepository extends JpaRepository<TeeTime, Long> {
 
     /**
      * 匹配引擎用：一条 watch 的全部命中时段。
-     * 条件对应 watch 字段——球场、日期区间、时间区间（"HH:mm" 字符串按字典序即时间序）、
-     * 空位数不小于需求人数、单人价不超过上限、仍可订。
+     * 条件对应 watch 字段——球场、一批具体日期（由关注的星期推出来，见 WatchWindow）、
+     * 时间区间（"HH:mm" 字符串按字典序即时间序）、空位数不小于需求人数、
+     * 单人价不超过上限、仍可订。
      * timeLocal / playDate 双排序，命中列表按“先到的日期、再到的时刻”展示。
      */
-    List<TeeTime> findByCourse_IdAndPlayDateBetweenAndTimeLocalBetweenAndAvailableSeatsGreaterThanEqualAndPriceLessThanEqualAndAvailableTrueOrderByPlayDateAscTimeLocalAsc(
+    List<TeeTime> findByCourse_IdAndPlayDateInAndTimeLocalBetweenAndAvailableSeatsGreaterThanEqualAndPriceLessThanEqualAndAvailableTrueOrderByPlayDateAscTimeLocalAsc(
             Long courseId,
-            LocalDate playDateStart,
-            LocalDate playDateEnd,
+            Collection<LocalDate> playDates,
             String timeLocalStart,
             String timeLocalEnd,
             int minSeats,

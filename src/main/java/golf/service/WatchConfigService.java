@@ -1,9 +1,12 @@
 package golf.service;
 
+import java.time.DayOfWeek;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
+import golf.model.Weekdays;
 import golf.model.dto.WatchConfigBatchDto;
 import golf.model.dto.WatchConfigDto;
 import golf.model.entity.Course;
@@ -43,8 +46,7 @@ public class WatchConfigService {
         for (Long courseId : batch.courseIds()) {
             WatchConfig watch = new WatchConfig();
             watch.setCourse(loadCourse(courseId));
-            watch.setDateStart(batch.dateStart());
-            watch.setDateEnd(batch.dateEnd());
+            watch.setWeekdays(requireWeekdays(batch.weekdays()));
             watch.setTimeStart(batch.timeStart());
             watch.setTimeEnd(batch.timeEnd());
             watch.setPlayers(batch.players());
@@ -68,8 +70,7 @@ public class WatchConfigService {
         WatchConfig watch = repository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Unknown watch id: " + id));
         watch.setCourse(loadCourse(dto.courseId()));
-        watch.setDateStart(dto.dateStart());
-        watch.setDateEnd(dto.dateEnd());
+        watch.setWeekdays(requireWeekdays(dto.weekdays()));
         watch.setTimeStart(dto.timeStart());
         watch.setTimeEnd(dto.timeEnd());
         watch.setPlayers(dto.players());
@@ -89,6 +90,18 @@ public class WatchConfigService {
                 .orElseThrow(() -> new IllegalArgumentException("Unknown course id: " + courseId));
     }
 
+    /**
+     * 一个星期都没勾就直接拒掉。这种 watch 存下来既不会抓也不会命中，
+     * 静静躺在列表里像是在生效——宁可当场报错，也别让人对着一条僵尸订阅等邮件。
+     */
+    private static Set<DayOfWeek> requireWeekdays(List<String> codes) {
+        Set<DayOfWeek> weekdays = Weekdays.of(codes);
+        if (weekdays.isEmpty()) {
+            throw new IllegalArgumentException("A watch needs at least one weekday, got: " + codes);
+        }
+        return weekdays;
+    }
+
     private WatchConfigDto toDto(WatchConfig watch) {
         Course course = watch.getCourse();
         return new WatchConfigDto(
@@ -96,8 +109,7 @@ public class WatchConfigService {
                 course.getId(),
                 course.getSlug(),
                 course.getName(),
-                watch.getDateStart(),
-                watch.getDateEnd(),
+                Weekdays.codes(watch.getWeekdays()),
                 watch.getTimeStart(),
                 watch.getTimeEnd(),
                 watch.getPlayers(),

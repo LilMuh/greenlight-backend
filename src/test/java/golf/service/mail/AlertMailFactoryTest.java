@@ -6,8 +6,10 @@ import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -251,8 +253,7 @@ class AlertMailFactoryTest {
     private static WatchConfig watch(int players) {
         WatchConfig watch = new WatchConfig();
         watch.setCourse(course());
-        watch.setDateStart(LocalDate.of(2026, 8, 4));
-        watch.setDateEnd(LocalDate.of(2026, 8, 11));
+        watch.setWeekdays(EnumSet.of(DayOfWeek.SATURDAY, DayOfWeek.SUNDAY));
         watch.setTimeStart("06:00");
         watch.setTimeEnd("10:00");
         watch.setPlayers(players);

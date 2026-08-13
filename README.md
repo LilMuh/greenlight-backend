@@ -35,10 +35,12 @@ src/main/resources/
 Scraping is driven entirely by `watch_config` — nothing gets polled unless somebody
 is watching it.
 
-1. `ScrapePlanService` turns the active watches into `(source, site, date, courses)`
-   jobs, clamped to `[today, today + 7]`. Same site + same day ⇒ one job with several
-   courses. No active watch ⇒ empty plan ⇒ the round is skipped without opening a
-   browser.
+1. A watch records **weekdays**, not dates — "every Saturday morning" stays true next
+   month. `WatchWindow` turns those weekdays back into the concrete dates inside
+   `[today, today + 7]`; scraping and matching both read that same list.
+   `ScrapePlanService` then turns the active watches into `(source, site, date, courses)`
+   jobs. Same site + same day ⇒ one job with several courses. No active watch ⇒ empty
+   plan ⇒ the round is skipped without opening a browser.
 2. `TeeTimeScrapeTask` runs that plan every 30 min and POSTs each job to
    [greenlight-scraper](https://github.com/LilMuh/greenlight-scraper), which owns the
    writes to `tee_time`. `fixedDelay` (not `fixedRate`) so rounds can never overlap.
@@ -47,7 +49,7 @@ is watching it.
    edge — matching now, not matching before — gets a mail. A slot that gets booked out
    stops at `available_seats = 0`, leaves the set, and re-entering it later is naturally
    a fresh edge.
-4. Creating a watch scrapes its dates first, *then* sends a baseline mail listing what
+4. Creating a watch scrapes its weekdays' dates first, *then* sends a baseline mail listing what
    already matches. Both happen after commit, on an async thread, so
    `POST /api/watch-configs` returns immediately (`WatchBootstrapListener`).
 
