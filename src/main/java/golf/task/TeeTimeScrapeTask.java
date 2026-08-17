@@ -54,7 +54,7 @@ public class TeeTimeScrapeTask {
      */
     @Scheduled(
             initialDelayString = "${greenlight.scrape.initial-delay-ms:0}",
-            fixedDelayString = "${greenlight.scrape.interval-ms:1800000}")
+            fixedDelayString = "${greenlight.scrape.interval-ms:900000}")
     public void scheduledRun() {
         run();
     }

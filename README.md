@@ -41,7 +41,7 @@ is watching it.
    `ScrapePlanService` then turns the active watches into `(source, site, date, courses)`
    jobs. Same site + same day ⇒ one job with several courses. No active watch ⇒ empty
    plan ⇒ the round is skipped without opening a browser.
-2. `TeeTimeScrapeTask` runs that plan every 30 min and POSTs each job to
+2. `TeeTimeScrapeTask` runs that plan every 15 min and POSTs each job to
    [greenlight-scraper](https://github.com/LilMuh/greenlight-scraper), which owns the
    writes to `tee_time`. `fixedDelay` (not `fixedRate`) so rounds can never overlap.
 3. Notification dedup uses **no ledger table**. The task snapshots each watch's set of
