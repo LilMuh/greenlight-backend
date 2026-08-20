@@ -41,8 +41,12 @@ spring:
       mail.smtp.timeout: 10000
       mail.smtp.writetimeout: 10000
 
-# 定时抓取节奏（TeeTimeScrapeTask）
 greenlight:
+  api:
+    # /api/** 的共享密钥（见 ApiKeyFilter）。留空 = 关卡关闭，本地开发不用带头。
+    # 公网暴露（Tailscale Funnel）时必须设：GREENLIGHT_API_KEY=...
+    key: ${GREENLIGHT_API_KEY:}
+  # 定时抓取节奏（TeeTimeScrapeTask）
   scrape:
     initial-delay-ms: 0        # 启动即先抓一轮
     interval-ms: 900000        # 之后每隔 15 分钟（上一轮结束算起）
