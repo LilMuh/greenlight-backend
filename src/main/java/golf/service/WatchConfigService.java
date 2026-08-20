@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 import golf.model.Weekdays;
 import golf.model.dto.WatchConfigBatchDto;
@@ -41,6 +42,7 @@ public class WatchConfigService {
     /** 批量创建：一组球场 + 一份共享 config，逐个球场建一条 watch。 */
     @Transactional
     public List<WatchConfigDto> create(WatchConfigBatchDto batch) {
+        requireTimeWindow(batch.timeStart(), batch.timeEnd());
         List<WatchConfigDto> created = new ArrayList<>();
         List<Long> createdIds = new ArrayList<>();
         for (Long courseId : batch.courseIds()) {
@@ -67,6 +69,7 @@ public class WatchConfigService {
     /** 更新一条：改 config（可含换球场），用 find-then-save。 */
     @Transactional
     public WatchConfigDto update(Long id, WatchConfigDto dto) {
+        requireTimeWindow(dto.timeStart(), dto.timeEnd());
         WatchConfig watch = repository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Unknown watch id: " + id));
         watch.setCourse(loadCourse(dto.courseId()));
@@ -94,6 +97,31 @@ public class WatchConfigService {
      * 一个星期都没勾就直接拒掉。这种 watch 存下来既不会抓也不会命中，
      * 静静躺在列表里像是在生效——宁可当场报错，也别让人对着一条僵尸订阅等邮件。
      */
+    /** 24 小时制的 "HH:MM"，零填充。和 tee_time.time_local 同格式，好直接比较。 */
+    private static final Pattern CLOCK = Pattern.compile("^([01]\\d|2[0-3]):[0-5]\\d$");
+
+    /**
+     * 时间窗必须格式合法，且结束严格晚于开始。
+     *
+     * 倒挂的窗口（结束早于开始）在 WatchMatchService 那句 BETWEEN 里恒为空集：
+     * 不报错、不告警，这条 watch 就永远不命中、永远不发邮件，建了等于没建。
+     * 两个值都零填充，所以字符串比较就是时间先后，和 SQL 里的口径一致。
+     */
+    private static void requireTimeWindow(String timeStart, String timeEnd) {
+        requireClock(timeStart);
+        requireClock(timeEnd);
+        if (timeEnd.compareTo(timeStart) <= 0) {
+            throw new IllegalArgumentException(
+                    "A watch needs an end later than its start, got: " + timeStart + "–" + timeEnd);
+        }
+    }
+
+    private static void requireClock(String value) {
+        if (value == null || !CLOCK.matcher(value).matches()) {
+            throw new IllegalArgumentException("Time must be 24-hour HH:MM, got: " + value);
+        }
+    }
+
     private static Set<DayOfWeek> requireWeekdays(List<String> codes) {
         Set<DayOfWeek> weekdays = Weekdays.of(codes);
         if (weekdays.isEmpty()) {
