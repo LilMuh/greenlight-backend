@@ -1,5 +1,6 @@
 package golf.config;
 
+import golf.error.ApiErrorCode;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -15,7 +16,7 @@ class ApiKeyFilterTest {
 
     private static final String KEY = "s3cret";
 
-    private record Result(int status, boolean reachedApp, String allowOrigin) {
+    private record Result(int status, boolean reachedApp, String allowOrigin, String body) {
     }
 
     /** 跑一次过滤器，返回状态码和请求有没有走到后面的应用。 */
@@ -33,7 +34,8 @@ class ApiKeyFilterTest {
         return new Result(
                 response.getStatus(),
                 chain.getRequest() != null,
-                response.getHeader("Access-Control-Allow-Origin"));
+                response.getHeader("Access-Control-Allow-Origin"),
+                response.getContentAsString());
     }
 
     /** 本地开发不配密钥：整道关卡关闭，不用带头也能调。 */
@@ -91,5 +93,22 @@ class ApiKeyFilterTest {
     @Test
     void rejectionGivesNoCorsHeaderForUnknownOrigin() throws Exception {
         assertThat(run(KEY, "GET", "/api/courses", null, "https://evil.example.com").allowOrigin()).isNull();
+    }
+
+    /**
+     * 401 的响应体形状和别处一样：{"code","message"}。
+     *
+     * 这条不是形式主义——这一路走不到 ApiExceptionHandler（过滤器在 DispatcherServlet
+     * 之前），所以 JSON 是这里手拼的，很容易在改动中和别处走散。走散的后果是前端
+     * 那张 code→文案表对 401 失效，密钥配错时只会显示一句笼统的「出错了」。
+     */
+    @Test
+    void rejectionBodyCarriesTheErrorCode() throws Exception {
+        Result result = run(KEY, "GET", "/api/courses", null, null);
+
+        assertThat(result.body())
+                .contains("\"code\":\"" + ApiErrorCode.UNAUTHORIZED.name() + "\"")
+                .contains("\"message\":")
+                .contains(ApiKeyFilter.HEADER);
     }
 }

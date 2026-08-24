@@ -1,7 +1,9 @@
 package golf.config;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 
+import golf.error.ApiErrorCode;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -9,7 +11,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -62,8 +63,13 @@ public class ApiKeyFilter extends OncePerRequestFilter {
         if (origin != null && CorsConfig.ALLOWED_ORIGINS.contains(origin)) {
             response.setHeader(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, origin);
         }
-        response.setStatus(HttpStatus.UNAUTHORIZED.value());
+        // 形状和 ApiExceptionHandler 回的一样：/api/** 的每个非 2xx 都带 code，没有例外。
+        // 这条走不到那个 handler（过滤器在 DispatcherServlet 之前），所以在这儿自己拼。
+        response.setStatus(ApiErrorCode.UNAUTHORIZED.status().value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        response.getWriter().write("{\"error\":\"missing or bad " + HEADER + "\"}");
+        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+        response.getWriter().write(
+                "{\"code\":\"" + ApiErrorCode.UNAUTHORIZED.name() + "\","
+                        + "\"message\":\"missing or bad " + HEADER + "\"}");
     }
 }

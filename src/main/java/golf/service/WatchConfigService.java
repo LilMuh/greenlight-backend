@@ -116,7 +116,16 @@ public class WatchConfigService {
         return toDto(repository.save(watch));
     }
 
+    /**
+     * 删一条。删不存在的 id 不当无事发生：deleteById 对着不存在的 id 是静默 no-op，
+     * 于是「另一个标签页已经删过了」和「真的删掉了」返回一模一样的 204，
+     * 界面上那条已经不存在的记录会安静地留在列表里。明确报 WATCH_NOT_FOUND，
+     * 前端就能说「这条没了，刷新一下」。
+     */
     public void delete(Long id) {
+        if (!repository.existsById(id)) {
+            throw new ApiException(ApiErrorCode.WATCH_NOT_FOUND, "Unknown watch id: " + id);
+        }
         repository.deleteById(id);
     }
 

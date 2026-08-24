@@ -9,6 +9,15 @@ logging:
     file: UTF-8
 
 spring:
+  # 路径不存在时抛异常，交给 ApiExceptionHandler 渲染成 {"code":"ENDPOINT_NOT_FOUND"}。
+  # 默认行为是转到内置的 /error 页，回一段 Whitelabel HTML——前端拿到的就是一坨
+  # 解析不了的东西，只能显示笼统提示。这个后端不提供任何静态资源，所以顺手把静态
+  # 资源映射也关掉：不关的话找不到的路径会先被当成静态文件，轮不到上面那个异常。
+  mvc:
+    throw-exception-if-no-handler-found: true
+  web:
+    resources:
+      add-mappings: false
   datasource:
     url: jdbc:postgresql://localhost:5432/greenlight
     username: greenlight

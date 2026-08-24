@@ -23,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -65,6 +66,8 @@ class WatchConfigServiceTest {
         });
         when(repository.findById(anyLong()))
                 .thenAnswer(call -> Optional.ofNullable(rows.get(call.<Long>getArgument(0))));
+        when(repository.existsById(anyLong())).thenAnswer(call -> rows.containsKey(call.<Long>getArgument(0)));
+        doAnswer(call -> rows.remove(call.<Long>getArgument(0))).when(repository).deleteById(anyLong());
         when(repository.findByEmailAndCourseId(any(), any())).thenAnswer(call -> {
             String email = call.getArgument(0);
             Long courseId = call.getArgument(1);
@@ -199,6 +202,25 @@ class WatchConfigServiceTest {
                 .isEqualTo(ApiErrorCode.WATCH_DUPLICATE);
 
         assertThat(rows.get(mine).getEmail()).isEqualTo(EMAIL);
+    }
+
+    @Test
+    void 删一条不存在的watch报WATCH_NOT_FOUND() {
+        // deleteById 对着不存在的 id 是静默 no-op，于是「另一个标签页已经删过了」和
+        // 「真的删掉了」返回一模一样的 204，界面上那条已经没了的记录会安静地留着
+        assertThatThrownBy(() -> service.delete(404L))
+                .isInstanceOf(ApiException.class)
+                .extracting(error -> ((ApiException) error).code())
+                .isEqualTo(ApiErrorCode.WATCH_NOT_FOUND);
+    }
+
+    @Test
+    void 删存在的watch就真删掉() {
+        Long id = service.create(batch(EMAIL, List.of(FRASERVIEW), "06:00")).get(0).id();
+
+        service.delete(id);
+
+        assertThat(rows).isEmpty();
     }
 
     @Test

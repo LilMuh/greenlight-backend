@@ -2,12 +2,13 @@ package golf.controller;
 
 import java.util.Map;
 
+import golf.error.ApiErrorCode;
+import golf.error.ApiException;
 import golf.service.mail.AlertMailFactory;
 import golf.service.mail.AlertMailFactory.Kind;
 import golf.service.mail.AlertMailFactory.RenderedMail;
 import golf.service.mail.MailSender;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -59,8 +60,11 @@ public class NotificationController {
             mailSender.send(to, mail.subject(), mail.html());
             return ResponseEntity.ok(Map.of("mode", mailMode, "to", to, "subject", mail.subject(), "sent", true));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
-                    .body(Map.of("mode", mailMode, "to", to, "sent", false, "error", String.valueOf(e.getMessage())));
+            // 以前这里自己拼了一个 {"mode","to","sent","error"} 的失败体——形状独一份，
+            // 调用方得为这一个接口单独写解析。改成和别处一样的 {"code","message"}，
+            // 原来那几个字段并进 message：它们是给人看的上下文，不是给代码看的。
+            throw new ApiException(ApiErrorCode.MAIL_SEND_FAILED,
+                    "could not send to " + to + " in " + mailMode + " mode: " + e.getMessage());
         }
     }
 
