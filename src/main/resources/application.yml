@@ -69,3 +69,4 @@ greenlight:
     # 先用站点级的地区名顶上；查不到就不显示地点那行。
     site-locations:
       golfvancouver: "Vancouver, BC"
+      golfburnaby: "Burnaby, BC"
