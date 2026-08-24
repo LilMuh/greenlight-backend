@@ -14,9 +14,10 @@ import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 /**
- * 新建 watch 的补数流程：抓一遍它关注的日期，再发基准邮件。
+ * watch 落库后的补数流程：抓一遍它关注的日期，再发基准邮件。
+ * 新建和「重复提交改掉现有那条」走的是同一条路，见 WatchesSavedEvent。
  *
- * 抓取现在是 watch 驱动的，新建的 watch 关注的日期很可能库里根本没数据——
+ * 抓取现在是 watch 驱动的，watch 关注的日期很可能库里根本没数据——
  * 直接算基准邮件只会得出「当前无满足时段」。所以先抓后发。
  *
  * AFTER_COMMIT + @Async 的原因：一次抓取要开浏览器过盾，几十秒起步。
@@ -46,7 +47,7 @@ public class WatchBootstrapListener {
 
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onWatchesCreated(WatchesCreatedEvent event) {
+    public void onWatchesSaved(WatchesSavedEvent event) {
         List<WatchConfig> watches = watchConfigRepository.findAllById(event.watchIds());
         if (watches.isEmpty()) {
             return;
@@ -54,7 +55,7 @@ public class WatchBootstrapListener {
 
         List<ScrapeJob> jobs = scrapePlanService.planFor(watches);
         if (!jobs.isEmpty()) {
-            log.info("{} watch(es) created: running {} scrape job(s) before the baseline mail",
+            log.info("{} watch(es) saved: running {} scrape job(s) before the baseline mail",
                     watches.size(), jobs.size());
             scrapeTask.execute(jobs);
         }
