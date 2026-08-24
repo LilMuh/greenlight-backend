@@ -11,7 +11,7 @@
     - 每个文字格都带 mso-line-height-rule:exactly，每张表每个格都给显式宽度
     - 宽度锁 600px，是各家客户端阅读区的安全宽度
 
-  结构：品牌条 / 球场短名 / 按日期分组的时段块（一天一条预订链接）/ 页脚。
+  结构：品牌条 / 球场短名 / 按日期分组的时段块（一天一条预订链接）/ 页脚（含改条件入口）。
 */-->
 <html xmlns:th="http://www.thymeleaf.org" lang="en">
 <head>
@@ -112,6 +112,17 @@
                   <span th:text="${footerNote}">You set up a GreenLight alert for Fraserview Golf Course.</span><br>
                   <span th:text="${criteria}">4 players · Aug 4 – Aug 11 · 06:00 – 10:00 · up to $90</span>
                 </td>
+              </tr>
+
+              <!--/*
+                改条件 / 退订的唯一入口——这个后端没有账号体系，不给这条链接，
+                收件人就只能自己记住前端地址。写法和上面每天那条 BOOK 一致：
+                下划线只给词本身，箭头和它之间那段空隙不划。没配 manage-url 则整行不渲染。
+              */-->
+              <tr th:if="${manageUrl}">
+                <td style="padding:12px 0 0 0; font-family:Arial,Helvetica,sans-serif; font-size:12px; line-height:20px; mso-line-height-rule:exactly; letter-spacing:0.06em;">
+                  <a th:href="${manageUrl}" href="#"
+                     style="color:#1a7f4f; text-decoration:none;"><span style="text-decoration:underline;">MANAGE ALERTS</span> &nbsp;&rarr;</a></td>
               </tr>
             </table>
           </td>

@@ -42,6 +42,16 @@ public class MailProperties {
      */
     private Map<String, String> siteLocations = new HashMap<>();
 
+    /**
+     * 页脚那条「MANAGE ALERTS →」指向的地址，也就是前端的 watch 编辑页。
+     *
+     * 收件人退订/改条件的唯一入口：这个后端没有账号体系，邮件里不放这条链接的话，
+     * 人只能自己记住前端地址。默认指向公开部署的那份，本地调试用环境变量覆盖。
+     *
+     * 置空则页脚整条不渲染，和 bookingUrlTemplate 一个规矩。
+     */
+    private String manageUrl = "";
+
     public String getMode() {
         return mode;
     }
@@ -72,5 +82,13 @@ public class MailProperties {
 
     public void setSiteLocations(Map<String, String> siteLocations) {
         this.siteLocations = siteLocations;
+    }
+
+    public String getManageUrl() {
+        return manageUrl;
+    }
+
+    public void setManageUrl(String manageUrl) {
+        this.manageUrl = manageUrl;
     }
 }

@@ -151,8 +151,16 @@ public class AlertMailFactory {
         context.setVariable("groups", groups);
         context.setVariable("footerNote", "You set up a GreenLight alert for " + courseName + ".");
         context.setVariable("criteria", criteria);
+        // 没配就传 null 而不是空串：模板那条 th:if 只在 null 上判得干净，
+        // 空串在 Thymeleaf 里算真假是版本相关的，不值得赌
+        context.setVariable("manageUrl", blankToNull(mailProperties.getManageUrl()));
 
         return new RenderedMail(subject, templateEngine.process(TEMPLATE, context));
+    }
+
+    /** 空白（含全空格）当没配。 */
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 
     /** 按开球日期分组，组内保持时间升序；预订链接一天一条，窗口覆盖当天首尾两个时段。 */

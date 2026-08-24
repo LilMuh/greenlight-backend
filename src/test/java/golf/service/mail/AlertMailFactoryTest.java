@@ -36,7 +36,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  *      在 SpEL 下解析得了；
  *   2. 时段按日期分组，一天只出一条预订链接，链接的时间窗口覆盖当天首尾两个时段；
  *   3. 地点跟在球场名后面；没配链接模板 / 查不到地点时对应那块整个不渲染，排版照常收尾；
- *   4. 标题的单复数和两种 Kind 的措辞对得上。
+ *   4. 标题的单复数和两种 Kind 的措辞对得上；
+ *   5. 页脚那条「改条件 / 退订」的链接在，且没配 manage-url 时整行消失。
  */
 class AlertMailFactoryTest {
 
@@ -60,6 +61,11 @@ class AlertMailFactoryTest {
     private static final String BOOK_LINK =
             "<span style=\"text-decoration:underline;\">BOOK</span> &nbsp;&rarr;";
 
+    /** 页脚那条通往前端 watch 编辑页的链接，写法和 BOOK 一致。 */
+    private static final String MANAGE_URL = "https://example.test/config.html";
+    private static final String MANAGE_LINK =
+            "<span style=\"text-decoration:underline;\">MANAGE ALERTS</span> &nbsp;&rarr;";
+
     @Test
     void rendersEverySlotField() {
         String html = factory.renderSample(Kind.NEW).html();
@@ -76,7 +82,8 @@ class AlertMailFactoryTest {
                 .contains("$52.00")                                  // 价格不带 CAD
                 .contains("Vancouver, BC")                           // 地点跟在球场名后面
                 .contains(BOOK_LINK)
-                .contains("You set up a GreenLight alert for Fraserview Golf Course.");
+                .contains("You set up a GreenLight alert for Fraserview Golf Course.")
+                .contains(MANAGE_LINK);                              // 页脚的改条件 / 退订入口
 
         // 顶部标签是短名，页脚才用完整球场名
         assertThat(html).doesNotContain("FRASERVIEW GOLF COURSE");
@@ -144,11 +151,43 @@ class AlertMailFactoryTest {
         // BOOK 链接整个不渲染，但日期分组本身照常收尾
         assertThat(html)
                 .doesNotContain("BOOK")
-                .doesNotContain("<a ")
                 .contains(sampleDate(3))
                 .contains("18:18")
                 .contains("$52.00")
                 .contains("You set up a GreenLight alert for Fraserview Golf Course.");
+
+        // 掉的只有 BOOK：页脚那条 MANAGE ALERTS 是独立配置的，整封信只剩它一个 <a>
+        assertThat(html).contains(MANAGE_LINK);
+        assertThat(countOccurrences(html, "<a ")).isEqualTo(1);
+    }
+
+    @Test
+    void linksToTheWatchEditorInTheFooter() {
+        String html = factory.renderSample(Kind.NEW).html();
+
+        // 一封信只有一条，且排在页脚说明之后——那里正是收件人找退订的地方
+        assertThat(countOccurrences(html, MANAGE_LINK)).isEqualTo(1);
+        assertThat(html).contains("href=\"" + MANAGE_URL + "\"");
+        assertThat(html.indexOf("You set up a GreenLight alert for"))
+                .isLessThan(html.indexOf(MANAGE_LINK));
+    }
+
+    @Test
+    void omitsTheManageLinkWhenNoUrlIsConfigured() {
+        for (String unset : List.of("", "   ")) {
+            MailProperties noManageUrl = properties(BOOKING_URL_TEMPLATE);
+            noManageUrl.setManageUrl(unset);
+            AlertMailFactory withoutManageLink =
+                    new AlertMailFactory(templateEngine(), new BookingLinkBuilder(noManageUrl), noManageUrl);
+
+            String html = withoutManageLink.renderSample(Kind.NEW).html();
+
+            // 整行不渲染，页脚其余部分照常
+            assertThat(html)
+                    .doesNotContain("MANAGE ALERTS")
+                    .contains("You set up a GreenLight alert for Fraserview Golf Course.")
+                    .contains(BOOK_LINK);
+        }
     }
 
     @Test
@@ -312,6 +351,7 @@ class AlertMailFactoryTest {
         MailProperties properties = new MailProperties();
         properties.setBookingUrlTemplate(bookingUrlTemplate);
         properties.setSiteLocations(Map.of("golfvancouver", "Vancouver, BC"));
+        properties.setManageUrl(MANAGE_URL);
         return properties;
     }
 
