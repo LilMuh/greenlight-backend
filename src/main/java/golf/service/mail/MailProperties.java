@@ -27,7 +27,8 @@ public class MailProperties {
      *   {slug}    = course.slug
      *   {date}    = 开球日期 ISO，如 2026-08-07
      *   {timeMin} / {timeMax} = 当天最早那个时段往前 1 小时到最晚那个往后 1 小时，小数小时
-     *   {players} = watch 的人数（时段本身没有这个概念）
+     *   {players} = watch 的人数（时段本身没有这个概念）。出厂模板故意不用它——
+     *               钉死人数会让落地页把时段筛掉，原因见 application.yml 那段注释
      *   {holes}   = tee_time.holes
      * 置空则邮件里不出现预订链接。CPS 那边各参数对应什么名字见 BookingLinkBuilder。
      */

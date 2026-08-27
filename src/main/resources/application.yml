@@ -72,8 +72,17 @@ greenlight:
     # 邮件里「Book this time」按钮的链接。占位符见 MailProperties；置空则不渲染按钮。
     # 参数名是 2026-08-04 用 OAB 驱动真实浏览器实测的（Date / Player / Hole /
     # TeeOffTimeMin / TeeOffTimeMax，首字母大写，跟它转给后端 API 的那套名字不同）。
-    # 点进去落到指定日期、指定人数、开球前后各 1 小时的时段列表。
-    booking-url-template: "https://{site}.cps.golf/onlineresweb/search-teetime?Date={date}&TeeOffTimeMin={timeMin}&TeeOffTimeMax={timeMax}&Player={players}&Hole={holes}"
+    # 点进去落到指定日期、开球前后各 1 小时的时段列表。
+    #
+    # 【故意不带 Player】落地页会把它原样转成 TeeTimes 接口的 numberOfPlayer，而这个参数
+    # 不只决定显示几个空位——它会把「不接受这个人数」的时段整条筛掉（2026-08-25 实测：
+    # 同一天同一批球场，numberOfPlayer=4 比 =2 少返回一条 minPlayer=2/maxPlayer=2 的时段）。
+    # scraper 抓取用的是 numberOfPlayer=0、即不筛，两边口径一旦不一致，一条 minPlayer 大于
+    # watch 人数的时段就会「我们发得出提醒、收信人点进去找不到」——2026-08-25 McCleery /
+    # Langara 那两封 13:33 的提醒就是这么来的。不给 Player，落地页自己发的就是
+    # numberOfPlayer=0，正好对上。前端查询页出于同样理由也不带，见 main.js。
+    # 想加回去之前先看 BookingUrlTemplateDefaultTest。
+    booking-url-template: "https://{site}.cps.golf/onlineresweb/search-teetime?Date={date}&TeeOffTimeMin={timeMin}&TeeOffTimeMax={timeMax}&Hole={holes}"
     # 球场地点，按 site 配。course 表没有地点列（表结构归 greenlight-database），
     # 先用站点级的地区名顶上；查不到就不显示地点那行。
     site-locations:
