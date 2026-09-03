@@ -140,6 +140,43 @@ class AlertMailFactoryTest {
         assertThat(html).contains("FRASERVIEW").doesNotContain("Vancouver, BC").doesNotContain("&nbsp;·&nbsp;");
     }
 
+    /**
+     * 一个 site 一个地点这条假设，到 westcoastgolfgroup 就不成立了：同一个站点下
+     * Hazelmere 在 Surrey、Belmont 在 Langley、两条 Swaneset 在 Pitt Meadows。
+     * 所以先按 course slug 查，站点级的那张表退成兜底。
+     */
+    @Test
+    void prefersTheCourseLocationOverTheSiteLocation() {
+        Course hazelmere = course("hazelmere", "Hazelmere Golf", "westcoastgolfgroup");
+        String html = renderWith(hazelmere, wcggProperties()).html();
+
+        assertThat(html).contains("Surrey, BC").doesNotContain("Metro Vancouver, BC");
+    }
+
+    @Test
+    void fallsBackToTheSiteLocationWhenTheCourseHasNoEntry() {
+        // 同站点、但 course-locations 里没配这个 slug
+        Course unmapped = course("swaneset-links", "Swaneset Links", "westcoastgolfgroup");
+        String html = renderWith(unmapped, wcggProperties()).html();
+
+        assertThat(html).contains("Metro Vancouver, BC");
+    }
+
+    /**
+     * 顶部短名的后缀剥离要覆盖两种写法：「... Golf Course」剥掉整截（老球场），
+     * 只以「... Course」结尾的剥掉后一个词。顺序不能反——先剥 " course" 的话
+     * 「Fraserview Golf Course」会停在「FRASERVIEW GOLF」。
+     */
+    @Test
+    void stripsATrailingCourseEvenWithoutTheGolfWord() {
+        Course swaneset = course("swaneset-resort", "Swaneset Resort Course", "westcoastgolfgroup");
+        String html = renderWith(swaneset, wcggProperties()).html();
+
+        assertThat(html).contains("SWANESET RESORT").doesNotContain("SWANESET RESORT COURSE");
+        // 页脚仍然用完整球场名，剥离只发生在顶部那行
+        assertThat(html).contains("You set up a GreenLight alert for Swaneset Resort Course.");
+    }
+
     @Test
     void dropsOnlyTheBookLinkWhenNoBookingTemplateIsConfigured() {
         MailProperties noLinks = properties("");
@@ -289,6 +326,33 @@ class AlertMailFactoryTest {
         return GROUP_DATE.format(LocalDate.now().plusDays(plusDays));
     }
 
+    /** 换一个球场、换一份配置渲染一封信。时段本身不重要，给一条就够顶部那行渲染出来。 */
+    private RenderedMail renderWith(Course course, MailProperties properties) {
+        AlertMailFactory withCourse =
+                new AlertMailFactory(templateEngine(), new BookingLinkBuilder(properties), properties);
+        WatchConfig watch = watch(4);
+        watch.setCourse(course);
+        return withCourse.render(
+                watch, List.of(teeTime(LocalDate.of(2026, 9, 6), "07:30", 4, new BigDecimal("105"))), Kind.NEW);
+    }
+
+    /** westcoastgolfgroup：course-locations 只配了一部分 slug，其余落到站点级兜底。 */
+    private static MailProperties wcggProperties() {
+        MailProperties properties = properties(BOOKING_URL_TEMPLATE);
+        properties.setSiteLocations(Map.of("westcoastgolfgroup", "Metro Vancouver, BC"));
+        properties.setCourseLocations(Map.of("hazelmere", "Surrey, BC"));
+        return properties;
+    }
+
+    private static Course course(String slug, String name, String site) {
+        Course course = newInstance(Course.class);
+        setField(course, "slug", slug);
+        setField(course, "name", name);
+        setField(course, "source", "cps");
+        setField(course, "site", site);
+        return course;
+    }
+
     private static WatchConfig watch(int players) {
         WatchConfig watch = new WatchConfig();
         watch.setCourse(course());
@@ -307,12 +371,7 @@ class AlertMailFactoryTest {
      * 都只在那条路径上跑得到。
      */
     private static Course course() {
-        Course course = newInstance(Course.class);
-        setField(course, "slug", "fraserview");
-        setField(course, "name", "Fraserview Golf Course");
-        setField(course, "source", "cps");
-        setField(course, "site", "golfvancouver");
-        return course;
+        return course("fraserview", "Fraserview Golf Course", "golfvancouver");
     }
 
     private static TeeTime teeTime(LocalDate playDate, String timeLocal, int availableSeats, BigDecimal price) {

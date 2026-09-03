@@ -44,6 +44,16 @@ public class MailProperties {
     private Map<String, String> siteLocations = new HashMap<>();
 
     /**
+     * 球场地点，按 course slug 配，优先于上面那张按 site 的表。
+     *
+     * 一个站点一个地点这条假设到 westcoastgolfgroup 就不成立了：同一个站点下
+     * Hazelmere 在 Surrey、Belmont 在 Langley、两条 Swaneset 在 Pitt Meadows。
+     * 于是精确到球场的配在这里，siteLocations 退成兜底——新增一个整站同城的
+     * 站点时照旧只写一行，不用把球场一个个列出来。
+     */
+    private Map<String, String> courseLocations = new HashMap<>();
+
+    /**
      * 页脚那条「MANAGE ALERTS →」指向的地址，也就是前端的 watch 编辑页。
      *
      * 收件人退订/改条件的唯一入口：这个后端没有账号体系，邮件里不放这条链接的话，
@@ -83,6 +93,14 @@ public class MailProperties {
 
     public void setSiteLocations(Map<String, String> siteLocations) {
         this.siteLocations = siteLocations;
+    }
+
+    public Map<String, String> getCourseLocations() {
+        return courseLocations;
+    }
+
+    public void setCourseLocations(Map<String, String> courseLocations) {
+        this.courseLocations = courseLocations;
     }
 
     public String getManageUrl() {

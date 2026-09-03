@@ -88,6 +88,16 @@ greenlight:
     site-locations:
       golfvancouver: "Vancouver, BC"
       golfburnaby: "Burnaby, BC"
+      # westcoastgolfgroup 一个站点横跨三座城市，站点级只能给个兜底，
+      # 精确到球场的写在下面的 course-locations 里
+      westcoastgolfgroup: "Metro Vancouver, BC"
+    # 按 course slug 配的地点，优先于上面的 site-locations。
+    # 只有站点内地点不统一时才需要列；golfvancouver / golfburnaby 一行都不用写。
+    course-locations:
+      hazelmere: "Surrey, BC"
+      belmont: "Langley, BC"
+      swaneset-resort: "Pitt Meadows, BC"
+      swaneset-links: "Pitt Meadows, BC"
     # 页脚「MANAGE ALERTS →」指向的前端 watch 编辑页。默认是公开部署的那份；
     # 本地调试指回自己的静态服务：GREENLIGHT_MANAGE_URL=http://localhost:5500/config.html
     # 置空则页脚不渲染这条链接。

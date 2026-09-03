@@ -51,8 +51,14 @@ public class AlertMailFactory {
 
     private static final String TEMPLATE = "mail/tee-time-alert";
 
-    /** 球场名去掉这个后缀就是正文顶部那个短名（FRASERVIEW GOLF COURSE → FRASERVIEW）。 */
-    private static final String COURSE_SUFFIX = " golf course";
+    /**
+     * 球场名去掉这些后缀就是正文顶部那个短名（FRASERVIEW GOLF COURSE → FRASERVIEW）。
+     *
+     * 顺序即优先级，长的在前：「Fraserview Golf Course」必须先命中 " golf course"，
+     * 否则会停在「FRASERVIEW GOLF」。第二条是给「... Course」这种不带 Golf 的名字留的
+     * （Swaneset Resort Course / Swaneset Links Course 是站点自己的写法）。
+     */
+    private static final List<String> COURSE_SUFFIXES = List.of(" golf course", " course");
 
     /** 预览行（收件箱里标题后面那截灰字）里最多提几个时段。 */
     private static final int PREHEADER_SLOTS = 3;
@@ -243,11 +249,18 @@ public class AlertMailFactory {
     }
 
     private String location(Course course) {
-        if (course == null || course.getSite() == null) {
+        if (course == null) {
             return null;
         }
-        // course 表没有地点这一列，先按 site 查配置；查不到返回 null，模板就只显示球场名
-        return mailProperties.getSiteLocations().get(course.getSite());
+        // course 表没有地点这一列，只能查配置：先按 slug 精确查，没配再退到 site 级那张表。
+        // 两张都查不到就返回 null，模板里那一段整个不渲染，只剩球场名。
+        String byCourse = course.getSlug() == null
+                ? null
+                : mailProperties.getCourseLocations().get(course.getSlug());
+        if (byCourse != null) {
+            return byCourse;
+        }
+        return course.getSite() == null ? null : mailProperties.getSiteLocations().get(course.getSite());
     }
 
     private static TeeTimeCard toCard(TeeTime teeTime) {
@@ -267,8 +280,12 @@ public class AlertMailFactory {
      */
     private static String courseLabel(String courseName) {
         String label = courseName;
-        if (label.toLowerCase(Locale.ENGLISH).endsWith(COURSE_SUFFIX)) {
-            label = label.substring(0, label.length() - COURSE_SUFFIX.length()).strip();
+        String lower = label.toLowerCase(Locale.ENGLISH);
+        for (String suffix : COURSE_SUFFIXES) {
+            if (lower.endsWith(suffix)) {
+                label = label.substring(0, label.length() - suffix.length()).strip();
+                break; // 只剥一层：命中长后缀之后不该再去剥短的
+            }
         }
         return label.toUpperCase(Locale.ENGLISH);
     }
