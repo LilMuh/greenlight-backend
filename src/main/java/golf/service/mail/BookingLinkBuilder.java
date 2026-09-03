@@ -21,11 +21,13 @@ import org.springframework.stereotype.Component;
  * 跟它转发给后端 API 时用的 searchDate / numberOfPlayer 不是一套）。判据是页面自己发出的
  * TeeTimes 请求里 searchDate 变成了指定那天。日期给 ISO（yyyy-MM-dd）即可。
  *
- * 时间窗口给小数小时，页面会截断到整点（17.3 → 17），所以前后各放 1 小时后
- * 实际落地会比 1 小时略宽——目标时段一定还在窗口内，够用。
+ * 一天一条链接：落地页一次列出这一天的时段，不用为每个时段各点一次。
  *
- * 一天一条链接，窗口从当天最早那个命中时段往前 1 小时到最晚那个往后 1 小时：
- * 落地页一次列出这一天所有想看的时段，不用为每个时段各点一次。
+ * {timeMin}/{timeMax} 仍然算——当天最早那个命中时段往前 1 小时到最晚那个往后 1 小时，
+ * 给的是小数小时，页面会截断到整点（17.3 → 17），所以实际落地比 1 小时略宽。
+ * 但【出厂模板不再用它们】：收信人点进来往往不是要订我们提醒的那一条，而是想看看那天
+ * 还剩什么，窗口一收，同一天别的时段得先把筛选清掉才看得见。想收窄把占位符配回去即可，
+ * 见 application.yml 和 BookingUrlTemplateDefaultTest。
  */
 @Component
 public class BookingLinkBuilder {

@@ -38,6 +38,23 @@ class BookingUrlTemplateDefaultTest {
                 .doesNotContain("{players}");
     }
 
+    /**
+     * 同样不许钉死时间窗口。理由和人数那条不同：时间窗口不会把时段筛掉，只是把落地页
+     * 预先收窄到开球前后一小时——但收信人点进来往往不是要订我们提醒的那一条，而是想看看
+     * 那天还剩什么。窗口一收，同一天别的时段得先把筛选条件清掉才看得见。
+     *
+     * 只落到日期，落地页给的就是这一天的完整时段列表；我们提醒的那几条也在里面。
+     * BookingLinkBuilder 仍然算得出 {timeMin}/{timeMax}，想收窄把占位符配回去就行。
+     */
+    @Test
+    void shippedBookingLinkDoesNotPinTimeWindow() {
+        assertThat(shippedBookingUrlTemplate())
+                .as("application.yml 的 %s", PROPERTY)
+                .doesNotContain("TeeOffTime")
+                .doesNotContain("{timeMin}")
+                .doesNotContain("{timeMax}");
+    }
+
     /** 直接从 classpath 上的 application.yml 读，不起容器（起容器要连库）。 */
     private static String shippedBookingUrlTemplate() {
         List<PropertySource<?>> sources;

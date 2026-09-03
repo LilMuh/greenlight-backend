@@ -82,7 +82,13 @@ greenlight:
     # Langara 那两封 13:33 的提醒就是这么来的。不给 Player，落地页自己发的就是
     # numberOfPlayer=0，正好对上。前端查询页出于同样理由也不带，见 main.js。
     # 想加回去之前先看 BookingUrlTemplateDefaultTest。
-    booking-url-template: "https://{site}.cps.golf/onlineresweb/search-teetime?Date={date}&TeeOffTimeMin={timeMin}&TeeOffTimeMax={timeMax}&Hole={holes}"
+    #
+    # 【故意不带 TeeOffTimeMin/Max】理由和 Player 不同：时间窗口不会把时段筛掉，只是把
+    # 落地页预先收窄到开球前后一小时。但人点进来往往不是要订我们提醒的那一条，而是想看看
+    # 那天还剩什么——窗口一收，同一天别的时段得先把筛选清掉才看得见。只落到日期，
+    # 页面给的就是这一天的完整列表，我们提醒的那几条也在里面。
+    # BookingLinkBuilder 仍然算得出 {timeMin}/{timeMax}，想收窄把占位符配回去即可。
+    booking-url-template: "https://{site}.cps.golf/onlineresweb/search-teetime?Date={date}&Hole={holes}"
     # 球场地点，按 site 配。course 表没有地点列（表结构归 greenlight-database），
     # 先用站点级的地区名顶上；查不到就不显示地点那行。
     site-locations:
