@@ -97,6 +97,8 @@ greenlight:
       # westcoastgolfgroup 一个站点横跨三座城市，站点级只能给个兜底，
       # 精确到球场的写在下面的 course-locations 里
       westcoastgolfgroup: "Metro Vancouver, BC"
+      # kingslinks 一个站点就一个球场，站点级这一行就够精确，不用再进 course-locations
+      kingslinks: "Delta, BC"
     # 按 course slug 配的地点，优先于上面的 site-locations。
     # 只有站点内地点不统一时才需要列；golfvancouver / golfburnaby 一行都不用写。
     course-locations:
